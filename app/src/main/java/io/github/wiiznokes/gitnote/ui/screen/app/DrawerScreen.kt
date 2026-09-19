@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.weight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -17,6 +18,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.filled.KeyboardReturn
 import androidx.compose.material.icons.rounded.CreateNewFolder
 import androidx.compose.material.icons.rounded.Folder
@@ -32,7 +34,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -42,11 +43,9 @@ import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.pointerInteropFilter
-import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.room.Embedded
 import io.github.wiiznokes.gitnote.R
@@ -80,9 +79,13 @@ fun DrawerScreen(
     deleteFolder: (NoteFolder) -> Unit,
     createNoteFolder: (relativeParentPath: String, name: String) -> Boolean,
 ) {
-
-
     val scope = rememberCoroutineScope()
+
+    fun selectFolder(path: String) {
+        openFolder(path)
+        scope.launch { drawerState.close() }
+    }
+
     BackHandler(enabled = drawerState.isOpen || currentNoteFolderRelativePath.isNotEmpty()) {
         if (currentNoteFolderRelativePath.isEmpty()) {
             scope.launch { drawerState.close() }
@@ -100,9 +103,6 @@ fun DrawerScreen(
             )
         },
         floatingActionButton = {
-
-            // bug: https://issuetracker.google.com/issues/224005027
-            //AnimatedVisibility(visible = currentNoteFolderRelativePath.isNotEmpty()) {
             if (currentNoteFolderRelativePath.isNotEmpty()) {
                 FloatingActionButton(
                     modifier = Modifier,
@@ -120,104 +120,94 @@ fun DrawerScreen(
             }
         }
     ) { paddingValues ->
-
-
         val listState = rememberLazyListState()
 
         LazyColumn(
-            modifier = Modifier
-                .padding(paddingValues = paddingValues),
+            modifier = Modifier.padding(paddingValues = paddingValues),
             state = listState
         ) {
-
             items(
                 drawerFolders,
-                key = { it.noteFolder.id }) { drawerNoteFolder ->
+                key = { it.noteFolder.id }
+            ) { drawerNoteFolder ->
                 Box {
-                    val dropDownExpanded = remember {
-                        mutableStateOf(false)
-                    }
+                    val dropDownExpanded = remember { mutableStateOf(false) }
+                    val clickPosition = remember { mutableStateOf(Offset.Zero) }
 
-                    val clickPosition = remember {
-                        mutableStateOf(Offset.Zero)
-                    }
-
-                    // need this box for clickPosition
-                    Box {
-                        CustomDropDown(
-                            expanded = dropDownExpanded,
-                            shape = MaterialTheme.shapes.medium,
-                            options = listOf(
-                                CustomDropDownModel(
-                                    text = stringResource(R.string.delete_this_folder),
-                                    onClick = {
-                                        deleteFolder(drawerNoteFolder.noteFolder)
-                                    }
-                                ),
-                            ),
-                            clickPosition = clickPosition
-                        )
-                    }
-
-                    CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
-
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .combinedClickable(
-                                    onLongClick = {
-                                        dropDownExpanded.value = true
-                                    },
-                                    onClick = {
-                                        openFolder(drawerNoteFolder.noteFolder.relativePath)
-                                    }
-                                )
-                                .pointerInteropFilter {
-                                    clickPosition.value = Offset(it.x, it.y)
-                                    false
-                                },
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-
-                            CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
-
-                                Text(
-                                    text = drawerNoteFolder.noteCount.toString(),
-                                    modifier = Modifier
-                                        .padding(LocalSpaces.current.smallPadding)
-                                )
-
-
-                                Row(
-                                    modifier = Modifier
-                                        .padding(LocalSpaces.current.smallPadding),
-                                    horizontalArrangement = Arrangement.Start,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    SimpleIcon(
-                                        modifier = Modifier
-                                            .size(IconDefaultSize),
-                                        imageVector = Icons.Rounded.Folder
-                                    )
-
-                                    SimpleSpacer(width = LocalSpaces.current.smallPadding)
-
-                                    Text(
-                                        text = drawerNoteFolder.noteFolder.fullName(),
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                    )
+                    CustomDropDown(
+                        expanded = dropDownExpanded,
+                        shape = MaterialTheme.shapes.medium,
+                        options = listOf(
+                            CustomDropDownModel(
+                                text = stringResource(R.string.delete_this_folder),
+                                onClick = {
+                                    deleteFolder(drawerNoteFolder.noteFolder)
                                 }
+                            ),
+                        ),
+                        clickPosition = clickPosition
+                    )
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .combinedClickable(
+                                onLongClick = {
+                                    dropDownExpanded.value = true
+                                },
+                                onClick = {
+                                    selectFolder(drawerNoteFolder.noteFolder.relativePath)
+                                }
+                            )
+                            .pointerInteropFilter {
+                                clickPosition.value = Offset(it.x, it.y)
+                                false
                             }
+                            .padding(
+                                start = LocalSpaces.current.smallPadding,
+                                end = 4.dp,
+                                top = LocalSpaces.current.smallPadding,
+                                bottom = LocalSpaces.current.smallPadding
+                            ),
+                        horizontalArrangement = Arrangement.Start,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        SimpleIcon(
+                            modifier = Modifier.size(IconDefaultSize),
+                            imageVector = Icons.Rounded.Folder
+                        )
+
+                        SimpleSpacer(width = LocalSpaces.current.smallPadding)
+
+                        Text(
+                            text = drawerNoteFolder.noteFolder.fullName(),
+                            modifier = Modifier.weight(1f),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+
+                        Text(
+                            text = drawerNoteFolder.noteCount.toString(),
+                            modifier = Modifier.padding(horizontal = 6.dp),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+
+                        IconButton(
+                            onClick = {
+                                openFolder(drawerNoteFolder.noteFolder.relativePath)
+                            }
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                         }
                     }
                 }
             }
         }
-
     }
-
 }
 
 
@@ -250,38 +240,32 @@ fun RowNFoldersNavigation(
             }
         },
         title = {
-            LazyRow(
-                modifier = Modifier
-            ) {
-
+            LazyRow {
                 itemsIndexed(containers) { index, item ->
-
-                    if (index != 0) Text(
-                        text = "/",
-                        maxLines = 1,
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.tertiary,
-                    )
+                    if (index != 0) {
+                        Text(
+                            text = " › ",
+                            maxLines = 1,
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.65f),
+                        )
+                    }
 
                     Text(
-                        modifier = Modifier
-                            .clickable {
-                                val containersPart = containers.slice(0..index).iterator()
-                                var path = ""
-
-                                for (folder in containersPart) {
-                                    path += if (containersPart.hasNext()) {
-                                        "$folder/"
-                                    } else {
-                                        folder
-                                    }
-                                }
-                                openFolder(path)
-                            },
+                        modifier = Modifier.clickable {
+                            val path = containers
+                                .take(index + 1)
+                                .joinToString("/")
+                            openFolder(path)
+                        },
                         text = item,
                         maxLines = 1,
                         style = MaterialTheme.typography.titleMedium.copy(
-                            textDecoration = TextDecoration.Underline
+                            textDecoration = if (index == containers.lastIndex) {
+                                TextDecoration.None
+                            } else {
+                                TextDecoration.Underline
+                            }
                         )
                     )
                 }
