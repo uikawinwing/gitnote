@@ -58,8 +58,7 @@ data class DrawerFolderModel(
 private fun ancestorsOf(path: String): Set<String> {
     if (path.isEmpty()) return emptySet()
     val parts = path.split("/")
-    return parts.indices
-        .dropLast(1)
+    return (0 until (parts.size - 1))
         .map { index -> parts.take(index + 1).joinToString("/") }
         .toSet()
 }
@@ -229,6 +228,20 @@ fun DrawerScreen(
             }
         }
     }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun RowNFoldersNavigation(
+    currentPath: String,
+    openFolder: (String) -> Unit,
+    createNoteFolder: (relativeParentPath: String, name: String) -> Boolean,
+) {
+    FolderTreeTopBar(
+        currentPath = currentPath,
+        selectRoot = { openFolder("") },
+        createNoteFolder = createNoteFolder
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
