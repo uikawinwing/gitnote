@@ -1,15 +1,12 @@
 package io.github.wiiznokes.gitnote.ui.theme
 
-import android.os.Build
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.material3.surfaceColorAtElevation
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import io.github.wiiznokes.gitnote.MyApp
 import io.github.wiiznokes.gitnote.R
@@ -85,15 +82,9 @@ fun GitNoteTheme(
     dynamicColor: Boolean,
     content: @Composable () -> Unit
 ) {
-    // Keep the dark palette intentionally neutral and gray. Some Android dynamic
-    // palettes resolve to near-black surfaces, which is harsher for long reading sessions.
-    val colorScheme = when {
-        darkTheme -> DarkColors
-        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-            dynamicLightColorScheme(LocalContext.current)
-        }
-        else -> LightColors
-    }
+    // This fork intentionally stays monochrome. Ignore Android dynamic colors so
+    // system accent colors cannot reintroduce blue, purple, or other hues.
+    val colorScheme = if (darkTheme) DarkColors else LightColors
 
     CompositionLocalProvider(
         LocalSpaces provides Spaces()
