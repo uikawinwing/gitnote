@@ -3,7 +3,6 @@ package io.github.wiiznokes.gitnote.ui.theme
 import android.os.Build
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.material3.surfaceColorAtElevation
@@ -86,32 +85,15 @@ fun GitNoteTheme(
     dynamicColor: Boolean,
     content: @Composable () -> Unit
 ) {
+    // Keep the dark palette intentionally neutral and gray. Some Android dynamic
+    // palettes resolve to near-black surfaces, which is harsher for long reading sessions.
     val colorScheme = when {
-        dynamicColor -> {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                val context = LocalContext.current
-                if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-            } else {
-                if (darkTheme) DarkColors else LightColors
-            }
-        }
-
         darkTheme -> DarkColors
+        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
+            dynamicLightColorScheme(LocalContext.current)
+        }
         else -> LightColors
     }
-
-    // todo: find if this comment fix the status bar issue (no)
-    /*
-    val view = LocalView.current
-    if (!view.isInEditMode) {
-        SideEffect {
-            val window = (view.context as Activity).window
-            window.statusBarColor = colorScheme.primary.toArgb()
-            WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = darkTheme
-        }
-    }
-
-     */
 
     CompositionLocalProvider(
         LocalSpaces provides Spaces()
@@ -123,8 +105,6 @@ fun GitNoteTheme(
             content = content
         )
     }
-
-
 }
 
 enum class Theme {
@@ -144,4 +124,3 @@ enum class Theme {
 
 val MaterialTheme.topBarColor: @Composable () -> Color
     get() = { this.colorScheme.surfaceColorAtElevation(3.0.dp) }
-
