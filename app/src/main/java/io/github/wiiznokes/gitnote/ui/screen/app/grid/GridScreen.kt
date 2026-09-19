@@ -391,20 +391,38 @@ private fun NoteCard(
                 verticalArrangement = Arrangement.Top,
                 horizontalAlignment = Alignment.Start,
             ) {
-                val title = if (showFullPathOfNotes || !gridNote.isUnique) {
-                    gridNote.note.relativePath
-                } else {
-                    gridNote.note.nameWithoutExtension()
+                val currentFolder = vm.currentNoteFolderRelativePath.collectAsState().value
+                val title = gridNote.note.fullName()
+                val parentPath = gridNote.note.parentPath()
+                val pathLabel = when {
+                    parentPath.isEmpty() || parentPath == currentFolder -> null
+                    showFullPathOfNotes || currentFolder.isEmpty() -> parentPath
+                    parentPath.startsWith("$currentFolder/") ->
+                        parentPath.removePrefix("$currentFolder/")
+                    !gridNote.isUnique -> parentPath
+                    else -> null
                 }
+
                 Text(
                     text = title,
-                    modifier = Modifier.padding(bottom = 6.dp),
+                    modifier = Modifier.padding(bottom = if (pathLabel == null) 6.dp else 2.dp),
                     overflow = TextOverflow.Ellipsis,
                     style = MaterialTheme.typography.titleMedium.copy(
                         fontWeight = FontWeight.Bold,
                     ),
                     color = MaterialTheme.colorScheme.tertiary
                 )
+
+                if (pathLabel != null) {
+                    Text(
+                        text = pathLabel,
+                        modifier = Modifier.padding(bottom = 6.dp),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
 
                 if (gridNote.note.fileExtension() is FileExtension.Md) {
 
