@@ -2,29 +2,23 @@ package io.github.wiiznokes.gitnote.ui.screen.app
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.KeyboardReturn
 import androidx.compose.material.icons.rounded.CreateNewFolder
 import androidx.compose.material.icons.rounded.Folder
 import androidx.compose.material.icons.rounded.Home
+import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.KeyboardArrowRight
 import androidx.compose.material3.DrawerState
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -33,17 +27,19 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.pointerInteropFilter
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.room.Embedded
@@ -52,21 +48,33 @@ import io.github.wiiznokes.gitnote.data.room.NoteFolder
 import io.github.wiiznokes.gitnote.ui.component.CustomDropDown
 import io.github.wiiznokes.gitnote.ui.component.CustomDropDownModel
 import io.github.wiiznokes.gitnote.ui.component.GetStringDialog
-import io.github.wiiznokes.gitnote.ui.component.SimpleIcon
-import io.github.wiiznokes.gitnote.ui.component.SimpleSpacer
-import io.github.wiiznokes.gitnote.ui.theme.IconDefaultSize
-import io.github.wiiznokes.gitnote.ui.theme.LocalSpaces
-import io.github.wiiznokes.gitnote.utils.getParentPath
 import kotlinx.coroutines.launch
-
-
-private const val TAG = "DrawerScreen"
 
 data class DrawerFolderModel(
     @Embedded val noteFolder: NoteFolder,
     val noteCount: Int,
 )
 
+private fun ancestorsOf(path: String): Set<String> {
+    if (path.isEmpty()) return emptySet()
+    val parts = path.split("/")
+    return parts.indices
+        .dropLast(1)
+        .map { index -> parts.take(index + 1).joinToString("/") }
+        .toSet()
+}
+
+private fun isVisibleInTree(path: String, expanded: Set<String>): Boolean {
+    val parent = path.substringBeforeLast("/", missingDelimiterValue = "")
+    if (parent.isEmpty()) return true
+
+    var current = parent
+    while (current.isNotEmpty()) {
+        if (current !in expanded) return false
+        current = current.substringBeforeLast("/", missingDelimiterValue = "")
+    }
+    return true
+}
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalComposeUiApi::class)
 @Composable
@@ -79,56 +87,53 @@ fun DrawerScreen(
     createNoteFolder: (relativeParentPath: String, name: String) -> Boolean,
 ) {
     val scope = rememberCoroutineScope()
+    var expandedFolders by remember { mutableStateOf(ancestorsOf(currentNoteFolderRelativePath)) }
+
+    LaunchedEffect(currentNoteFolderRelativePath) {
+        expandedFolders = expandedFolders + ancestorsOf(currentNoteFolderRelativePath)
+    }
 
     fun selectFolder(path: String) {
         openFolder(path)
         scope.launch { drawerState.close() }
     }
 
-    BackHandler(enabled = drawerState.isOpen || currentNoteFolderRelativePath.isNotEmpty()) {
-        if (currentNoteFolderRelativePath.isEmpty()) {
-            scope.launch { drawerState.close() }
-        } else {
-            openFolder(getParentPath(currentNoteFolderRelativePath))
-        }
+    BackHandler(enabled = drawerState.isOpen) {
+        scope.launch { drawerState.close() }
+    }
+
+    val childParents = remember(drawerFolders) {
+        drawerFolders
+            .map { it.noteFolder.relativePath.substringBeforeLast("/", missingDelimiterValue = "") }
+            .toSet()
+    }
+
+    val visibleFolders = remember(drawerFolders, expandedFolders) {
+        drawerFolders.filter { isVisibleInTree(it.noteFolder.relativePath, expandedFolders) }
     }
 
     Scaffold(
         topBar = {
-            RowNFoldersNavigation(
+            FolderTreeTopBar(
                 currentPath = currentNoteFolderRelativePath,
-                openFolder = openFolder,
+                selectRoot = { selectFolder("") },
                 createNoteFolder = createNoteFolder
             )
-        },
-        floatingActionButton = {
-            if (currentNoteFolderRelativePath.isNotEmpty()) {
-                FloatingActionButton(
-                    modifier = Modifier,
-                    containerColor = MaterialTheme.colorScheme.secondary,
-                    shape = RoundedCornerShape(20.dp),
-                    onClick = {
-                        openFolder(getParentPath(currentNoteFolderRelativePath))
-                    }
-                ) {
-                    SimpleIcon(
-                        imageVector = Icons.AutoMirrored.Filled.KeyboardReturn,
-                        tint = MaterialTheme.colorScheme.onSecondary
-                    )
-                }
-            }
         }
     ) { paddingValues ->
-        val listState = rememberLazyListState()
-
         LazyColumn(
-            modifier = Modifier.padding(paddingValues = paddingValues),
-            state = listState
+            modifier = Modifier.padding(paddingValues)
         ) {
             items(
-                drawerFolders,
+                visibleFolders,
                 key = { it.noteFolder.id }
-            ) { drawerNoteFolder ->
+            ) { drawerFolder ->
+                val path = drawerFolder.noteFolder.relativePath
+                val depth = path.count { it == '/' }
+                val hasChildren = path in childParents
+                val expanded = path in expandedFolders
+                val selected = path == currentNoteFolderRelativePath
+
                 Box {
                     val dropDownExpanded = remember { mutableStateOf(false) }
                     val clickPosition = remember { mutableStateOf(Offset.Zero) }
@@ -139,10 +144,8 @@ fun DrawerScreen(
                         options = listOf(
                             CustomDropDownModel(
                                 text = stringResource(R.string.delete_this_folder),
-                                onClick = {
-                                    deleteFolder(drawerNoteFolder.noteFolder)
-                                }
-                            ),
+                                onClick = { deleteFolder(drawerFolder.noteFolder) }
+                            )
                         ),
                         clickPosition = clickPosition
                     )
@@ -150,58 +153,77 @@ fun DrawerScreen(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .combinedClickable(
-                                onLongClick = {
-                                    dropDownExpanded.value = true
-                                },
-                                onClick = {
-                                    selectFolder(drawerNoteFolder.noteFolder.relativePath)
+                            .background(
+                                if (selected) {
+                                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f)
+                                } else {
+                                    MaterialTheme.colorScheme.surface
                                 }
+                            )
+                            .combinedClickable(
+                                onLongClick = { dropDownExpanded.value = true },
+                                onClick = { selectFolder(path) }
                             )
                             .pointerInteropFilter {
                                 clickPosition.value = Offset(it.x, it.y)
                                 false
                             }
                             .padding(
-                                start = LocalSpaces.current.smallPadding,
-                                end = 4.dp,
-                                top = LocalSpaces.current.smallPadding,
-                                bottom = LocalSpaces.current.smallPadding
+                                start = (8 + depth * 18).dp,
+                                end = 8.dp,
+                                top = 7.dp,
+                                bottom = 7.dp
                             ),
-                        horizontalArrangement = Arrangement.Start,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        SimpleIcon(
-                            modifier = Modifier.size(IconDefaultSize),
-                            imageVector = Icons.Rounded.Folder
-                        )
-
-                        SimpleSpacer(width = LocalSpaces.current.smallPadding)
-
-                        Text(
-                            text = drawerNoteFolder.noteFolder.fullName(),
-                            modifier = Modifier.weight(1f),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-
-                        Text(
-                            text = drawerNoteFolder.noteCount.toString(),
-                            modifier = Modifier.padding(horizontal = 6.dp),
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-
                         IconButton(
+                            modifier = Modifier.size(36.dp),
+                            enabled = hasChildren,
                             onClick = {
-                                openFolder(drawerNoteFolder.noteFolder.relativePath)
+                                expandedFolders = if (expanded) {
+                                    expandedFolders - path
+                                } else {
+                                    expandedFolders + path
+                                }
                             }
                         ) {
-                            Icon(
-                                imageVector = Icons.Rounded.KeyboardArrowRight,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                            if (hasChildren) {
+                                Icon(
+                                    imageVector = if (expanded) {
+                                        Icons.Rounded.KeyboardArrowDown
+                                    } else {
+                                        Icons.Rounded.KeyboardArrowRight
+                                    },
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
                         }
+
+                        Icon(
+                            modifier = Modifier
+                                .padding(horizontal = 4.dp)
+                                .size(24.dp),
+                            imageVector = Icons.Rounded.Folder,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+
+                        Text(
+                            text = drawerFolder.noteFolder.fullName(),
+                            modifier = Modifier
+                                .weight(1f)
+                                .padding(start = 8.dp),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+
+                        Text(
+                            text = drawerFolder.noteCount.toString(),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = MaterialTheme.typography.bodySmall
+                        )
                     }
                 }
             }
@@ -209,77 +231,45 @@ fun DrawerScreen(
     }
 }
 
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun RowNFoldersNavigation(
+private fun FolderTreeTopBar(
     currentPath: String,
-    openFolder: (String) -> Unit,
+    selectRoot: () -> Unit,
     createNoteFolder: (relativeParentPath: String, name: String) -> Boolean,
 ) {
-    val containers = if (currentPath.isEmpty()) emptyList() else currentPath.split('/')
-
     TopAppBar(
         colors = TopAppBarDefaults.topAppBarColors(
-            containerColor = MaterialTheme.colorScheme.secondaryContainer,
-            navigationIconContentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-            actionIconContentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-            titleContentColor = MaterialTheme.colorScheme.onSecondaryContainer
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
+            navigationIconContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+            actionIconContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+            titleContentColor = MaterialTheme.colorScheme.onSurface
         ),
         navigationIcon = {
-            IconButton(
-                onClick = {
-                    openFolder("")
-                }
-            ) {
+            IconButton(onClick = selectRoot) {
                 Icon(
                     imageVector = Icons.Rounded.Home,
                     contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         },
         title = {
-            LazyRow {
-                itemsIndexed(containers) { index, item ->
-                    if (index != 0) {
-                        Text(
-                            text = " › ",
-                            maxLines = 1,
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.65f),
-                        )
-                    }
-
-                    Text(
-                        modifier = Modifier.clickable {
-                            val path = containers
-                                .take(index + 1)
-                                .joinToString("/")
-                            openFolder(path)
-                        },
-                        text = item,
-                        maxLines = 1,
-                        style = MaterialTheme.typography.titleMedium.copy(
-                            textDecoration = if (index == containers.lastIndex) {
-                                TextDecoration.None
-                            } else {
-                                TextDecoration.Underline
-                            }
-                        )
-                    )
-                }
-            }
+            Text(
+                text = currentPath.ifEmpty { "Folders" },
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                style = MaterialTheme.typography.titleMedium
+            )
         },
         actions = {
-            val showCreateNewFolder = rememberSaveable {
-                mutableStateOf(false)
-            }
+            val showCreateNewFolder = rememberSaveable { mutableStateOf(false) }
 
-            IconButton(onClick = {
-                showCreateNewFolder.value = true
-            }) {
-                SimpleIcon(
-                    imageVector = Icons.Rounded.CreateNewFolder
+            IconButton(onClick = { showCreateNewFolder.value = true }) {
+                Icon(
+                    imageVector = Icons.Rounded.CreateNewFolder,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
 
