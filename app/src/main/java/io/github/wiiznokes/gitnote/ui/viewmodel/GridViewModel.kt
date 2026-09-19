@@ -235,17 +235,7 @@ class GridViewModel : ViewModel() {
         CoroutineScope(Dispatchers.IO), SharingStarted.WhileSubscribed(5000), PagingData.empty()
     )
 
-    // todo: use pager
-    @OptIn(ExperimentalCoroutinesApi::class)
-    val drawerFolders = combine(
-        currentNoteFolderRelativePath,
-        prefs.sortOrderFolder.getFlow(),
-    ) { currentNoteFolderRelativePath, sortOrder ->
-        Pair(currentNoteFolderRelativePath, sortOrder)
-    }.flatMapLatest { pair ->
-        val (currentNoteFolderRelativePath, sortOrder) = pair
-        dao.drawerFolders(currentNoteFolderRelativePath, sortOrder)
-    }.stateIn(
+    val drawerFolders = dao.drawerFolderTree().stateIn(
         CoroutineScope(Dispatchers.IO), SharingStarted.WhileSubscribed(5000), emptyList()
     )
 
