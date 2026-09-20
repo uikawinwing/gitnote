@@ -145,7 +145,10 @@ class AppPreferences(
     val showFullPathOfNotes = booleanPreference("showFullPathOfNotes", false)
 
     val defaultExtension = stringPreference("defaultExtension", "md")
-    val showLinesNumber = booleanPreference("showLinesNumber", false)
+    val showLinesNumber = booleanPreference("showLinesNumber", true)
+    val editorFontSize = intPreference("editorFontSize", 16)
+    val showIndentGuides = booleanPreference("showIndentGuides", true)
+    val validateTextStructure = booleanPreference("validateTextStructure", true)
 
     val folderFilters = setPreference(
         "folderFilters", setOf(
