@@ -179,6 +179,7 @@ dependencies {
 
     // Compose Navigation
     implementation(libs.reimagined.navigation)
+    implementation("org.yaml:snakeyaml:2.4")
 
     // Markdown
     implementation(libs.compose.markdown.core)
