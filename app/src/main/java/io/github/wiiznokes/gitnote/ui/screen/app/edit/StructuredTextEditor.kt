@@ -17,11 +17,14 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
@@ -29,7 +32,6 @@ import androidx.compose.ui.unit.sp
 import io.github.wiiznokes.gitnote.ui.viewmodel.edit.TextVM
 import org.yaml.snakeyaml.Yaml
 import kotlin.math.max
-import kotlin.math.min
 
 private data class StructureStatus(
     val ok: Boolean,
@@ -82,16 +84,10 @@ fun StructuredTextEditor(
                     if (showLineNumbers) {
                         val lines = textContent.text.split("\n")
                         val digits = max(2, lines.size.toString().length)
-                        val gutter = remember(textContent.text, showIndentGuides) {
-                            lines.mapIndexed { index, line ->
-                                val indent = if (showIndentGuides) indentDepth(line) else 0
-                                val guides = if (indent > 0) {
-                                    " " + "│".repeat(min(indent, 5))
-                                } else {
-                                    ""
-                                }
-                                (index + 1).toString().padStart(digits, ' ') + guides
-                            }.joinToString("\n")
+                        val gutter = remember(textContent.text) {
+                            lines.indices.joinToString("\n") { index ->
+                                (index + 1).toString().padStart(digits, ' ')
+                            }
                         }
 
                         Text(
@@ -104,6 +100,28 @@ fun StructuredTextEditor(
                         )
                     }
 
+                    val lines = remember(textContent.text) {
+                        textContent.text.split("\n")
+                    }
+                    val textMeasurer = rememberTextMeasurer()
+                    val spaceWidthPx = remember(fontSize) {
+                        textMeasurer.measure(
+                            text = " ",
+                            style = textStyle,
+                        ).size.width.toFloat()
+                    }
+                    val rainbow = remember {
+                        listOf(
+                            Color(0xFFFF6B6B),
+                            Color(0xFFFFB86C),
+                            Color(0xFFF1FA8C),
+                            Color(0xFF50FA7B),
+                            Color(0xFF8BE9FD),
+                            Color(0xFFBD93F9),
+                            Color(0xFFFF79C6),
+                        )
+                    }
+
                     Box(
                         modifier = Modifier
                             .weight(1f)
@@ -113,6 +131,34 @@ fun StructuredTextEditor(
                             modifier = Modifier
                                 .widthIn(min = minEditorWidth)
                                 .heightIn(min = minEditorHeight)
+                                .drawBehind {
+                                    if (showIndentGuides) {
+                                        val topPadding = 12.dp.toPx()
+                                        val leftPadding = 10.dp.toPx()
+                                        val lineHeightPx = with(this) {
+                                            (fontSize * 1.55f).sp.toPx()
+                                        }
+                                        val strokeWidth = 1.4.dp.toPx()
+
+                                        lines.forEachIndexed { lineIndex, line ->
+                                            val depth = indentDepth(line)
+                                            if (depth <= 0) return@forEachIndexed
+
+                                            val yStart = topPadding + lineIndex * lineHeightPx
+                                            val yEnd = yStart + lineHeightPx
+
+                                            for (level in 1..depth.coerceAtMost(12)) {
+                                                val x = leftPadding + (level * 2 * spaceWidthPx) - (spaceWidthPx * 0.55f)
+                                                drawLine(
+                                                    color = rainbow[(level - 1) % rainbow.size].copy(alpha = 0.78f),
+                                                    start = androidx.compose.ui.geometry.Offset(x, yStart),
+                                                    end = androidx.compose.ui.geometry.Offset(x, yEnd),
+                                                    strokeWidth = strokeWidth,
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
                                 .padding(horizontal = 10.dp, vertical = 12.dp)
                                 .focusRequester(textFocusRequester),
                             value = textContent,
