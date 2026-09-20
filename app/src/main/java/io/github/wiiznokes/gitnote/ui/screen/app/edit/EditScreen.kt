@@ -241,7 +241,8 @@ fun EditScreen(
                             textFocusRequester = textFocusRequester,
                             onFinished = onFinished,
                             isReadOnlyModeActive = isReadOnlyModeActive,
-                            textContent = textContent
+                            textContent = textContent,
+                            extension = extension.text,
                         )
                     }
                 }
@@ -293,26 +294,13 @@ fun GenericTextField(
     onFinished: () -> Unit,
     isReadOnlyModeActive: Boolean = false,
     textContent: TextFieldValue,
+    extension: String,
 ) {
-    TextField(
-        modifier = Modifier
-            .fillMaxSize()
-            .focusRequester(textFocusRequester),
-        value = textContent,
-        onValueChange = { vm.onValueChange(it) },
-        colors = TextFieldDefaults.colors(
-            focusedContainerColor = MaterialTheme.colorScheme.background,
-            unfocusedContainerColor = MaterialTheme.colorScheme.background,
-            focusedTextColor = MaterialTheme.colorScheme.onBackground,
-            unfocusedTextColor = MaterialTheme.colorScheme.onBackground,
-            focusedIndicatorColor = Color.Transparent,
-            unfocusedIndicatorColor = Color.Transparent,
-        ),
-        keyboardActions = KeyboardActions(
-            onDone = { vm.save(onSuccess = onFinished) }
-        ),
-        readOnly = isReadOnlyModeActive
+    StructuredTextEditor(
+        vm = vm,
+        textFocusRequester = textFocusRequester,
+        textContent = textContent,
+        extension = extension,
+        isReadOnlyModeActive = isReadOnlyModeActive,
     )
-
-
 }
