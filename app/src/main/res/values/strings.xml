@@ -29,7 +29,10 @@
     <string name="folder_filters_subtitle">Define regex to filter folders of the repository</string>
     <string name="edit">Edit</string>
     <string name="default_note_extension">Default extension for notes</string>
-    <string name="show_lines_number">Show lines number</string>
+    <string name="show_lines_number">Show line numbers</string>
+    <string name="editor_font_size">Editor font size</string>
+    <string name="show_indent_guides">Show indentation guides</string>
+    <string name="validate_text_structure">Validate Markdown / YAML structure</string>
     <string name="repository">Repository</string>
     <string name="password">Password</string>
     <string name="username">Username</string>
