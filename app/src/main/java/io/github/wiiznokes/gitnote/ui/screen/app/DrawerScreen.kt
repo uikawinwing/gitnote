@@ -17,6 +17,7 @@ import androidx.compose.material.icons.rounded.Folder
 import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.KeyboardArrowRight
+import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material3.DrawerState
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -160,8 +161,18 @@ fun DrawerScreen(
                                 }
                             )
                             .combinedClickable(
-                                onLongClick = { dropDownExpanded.value = true },
-                                onClick = { selectFolder(path) }
+                                onLongClick = { selectFolder(path) },
+                                onClick = {
+                                    if (hasChildren) {
+                                        expandedFolders = if (expanded) {
+                                            expandedFolders - path
+                                        } else {
+                                            expandedFolders + path
+                                        }
+                                    } else {
+                                        selectFolder(path)
+                                    }
+                                }
                             )
                             .pointerInteropFilter {
                                 clickPosition.value = Offset(it.x, it.y)
@@ -175,16 +186,9 @@ fun DrawerScreen(
                             ),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        IconButton(
+                        Box(
                             modifier = Modifier.size(36.dp),
-                            enabled = hasChildren,
-                            onClick = {
-                                expandedFolders = if (expanded) {
-                                    expandedFolders - path
-                                } else {
-                                    expandedFolders + path
-                                }
-                            }
+                            contentAlignment = Alignment.Center
                         ) {
                             if (hasChildren) {
                                 Icon(
@@ -223,6 +227,17 @@ fun DrawerScreen(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             style = MaterialTheme.typography.bodySmall
                         )
+
+                        IconButton(
+                            modifier = Modifier.size(34.dp),
+                            onClick = { dropDownExpanded.value = true }
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.MoreVert,
+                                contentDescription = "Folder actions",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
                 }
             }
