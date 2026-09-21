@@ -64,6 +64,9 @@ fun LoadKeysFromDeviceScreen(
             val privateKeyPassword = rememberSaveable(stateSaver = TextFieldValue.Saver) {
                 mutableStateOf(TextFieldValue())
             }
+            val branch = rememberSaveable(stateSaver = TextFieldValue.Saver) {
+                mutableStateOf(TextFieldValue())
+            }
 
             SetupLine(
                 text = stringResource(R.string.public_key),
@@ -127,6 +130,19 @@ fun LoadKeysFromDeviceScreen(
             }
 
             SetupLine(
+                text = "Branch (optional)"
+            ) {
+                OutlinedTextField(
+                    modifier = Modifier.fillMaxWidth(),
+                    value = branch.value,
+                    onValueChange = { branch.value = it },
+                    label = { Text(text = "Branch") },
+                    placeholder = { Text(text = "main") },
+                    singleLine = true,
+                )
+            }
+
+            SetupLine(
                 text = stringResource(R.string.try_cloning)
             ) {
                 SetupButton(
@@ -136,6 +152,7 @@ fun LoadKeysFromDeviceScreen(
                         vm.cloneRepo(
                             storageConfig = storageConfig,
                             remoteUrl = url,
+                            branch = branch.value.text.ifBlank { null },
                             cred = Cred.Ssh(
                                 publicKey = publicKey.value.text,
                                 privateKey = privateKey.value.text,
