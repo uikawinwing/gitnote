@@ -75,7 +75,9 @@ fun CredentialsScreen(
             val password = rememberSaveable(stateSaver = TextFieldValue.Saver) {
                 mutableStateOf(TextFieldValue())
             }
-
+            val branch = rememberSaveable(stateSaver = TextFieldValue.Saver) {
+                mutableStateOf(TextFieldValue())
+            }
 
             val usernameFocusRequester = remember { FocusRequester() }
             val passwordFocusRequester = remember { FocusRequester() }
@@ -136,6 +138,19 @@ fun CredentialsScreen(
             }
 
             SetupLine(
+                text = "Branch (optional)"
+            ) {
+                OutlinedTextField(
+                    modifier = Modifier.fillMaxSize(),
+                    value = branch.value,
+                    onValueChange = { branch.value = it },
+                    label = { Text(text = "Branch") },
+                    placeholder = { Text(text = "main") },
+                    singleLine = true,
+                )
+            }
+
+            SetupLine(
                 text = stringResource(R.string.try_cloning)
             ) {
 
@@ -145,6 +160,7 @@ fun CredentialsScreen(
                         vm.cloneRepo(
                             storageConfig = storageConfig,
                             remoteUrl = url,
+                            branch = branch.value.text.ifBlank { null },
                             cred = Cred.UserPassPlainText(
                                 username = username.value.text,
                                 password = password.value.text,
