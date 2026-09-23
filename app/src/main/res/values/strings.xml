@@ -172,4 +172,6 @@
     <string name="confirmation_quit_edit_dialog">Are you sure you want to quit ? You will lose all changes.</string>
     <string name="warning_folder_deletion">WARNING: Are you sure you want to continue? The directory will be deleted.</string>
 
+    <string name="show_note_preview">Show note previews</string>
+    <string name="hide_note_preview">Hide note previews</string>
 </resources>
