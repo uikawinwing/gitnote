@@ -265,6 +265,84 @@ open class TextVM() : ViewModel() {
         _content.value = history[historyManager.index + 1].v.copy()
     }
 
+    fun matchCount(query: String): Int {
+        if (query.isEmpty()) return 0
+
+        var count = 0
+        var start = 0
+        val text = content.value.text
+
+        while (start <= text.length - query.length) {
+            val index = text.indexOf(query, startIndex = start)
+            if (index < 0) break
+            count += 1
+            start = index + query.length
+        }
+        return count
+    }
+
+    fun findNext(query: String): Boolean {
+        if (query.isEmpty()) return false
+
+        val value = content.value
+        val text = value.text
+        if (text.isEmpty()) return false
+
+        val startFrom = value.selection.max.coerceIn(0, text.length)
+        var index = text.indexOf(query, startIndex = startFrom)
+
+        if (index < 0 && startFrom > 0) {
+            index = text.indexOf(query, startIndex = 0)
+        }
+
+        if (index < 0) return false
+
+        _content.value = value.copy(
+            selection = TextRange(index, index + query.length)
+        )
+        return true
+    }
+
+    fun replaceCurrent(query: String, replacement: String): Boolean {
+        if (query.isEmpty()) return false
+
+        val value = content.value
+        val start = value.selection.min.coerceIn(0, value.text.length)
+        val end = value.selection.max.coerceIn(start, value.text.length)
+        val selected = value.text.substring(start, end)
+
+        if (selected != query) {
+            return findNext(query)
+        }
+
+        val newText = value.text.replaceRange(start, end, replacement)
+        val newCursor = start + replacement.length
+
+        onValueChange(
+            TextFieldValue(
+                text = newText,
+                selection = TextRange(newCursor)
+            )
+        )
+        return true
+    }
+
+    fun replaceAll(query: String, replacement: String): Int {
+        val count = matchCount(query)
+        if (count == 0) return 0
+
+        val newText = content.value.text.replace(query, replacement)
+        val newCursor = content.value.selection.start.coerceAtMost(newText.length)
+
+        onValueChange(
+            TextFieldValue(
+                text = newText,
+                selection = TextRange(newCursor)
+            )
+        )
+        return count
+    }
+
     fun setReadOnlyMode(value: Boolean) {
         shouldForceNotReadOnlyMode.value = false
 
