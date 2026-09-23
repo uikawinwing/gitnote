@@ -3,6 +3,7 @@ package io.github.wiiznokes.gitnote.ui.screen.app.edit
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.scrollable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -13,10 +14,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Redo
 import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
@@ -85,20 +88,105 @@ fun DefaultRow(
         val bottomSheetExpanded = rememberSaveable { mutableStateOf(false) }
 
         if (bottomSheetExpanded.value) {
+            val findText = rememberSaveable { mutableStateOf("") }
+            val replaceText = rememberSaveable { mutableStateOf("") }
+            val matchCount = vm.matchCount(findText.value)
+
             ModalBottomSheet(onDismissRequest = { bottomSheetExpanded.value = false }) {
-                Text(
+                Column(
                     modifier = Modifier
-                        .padding(10.dp),
-                    text = stringResource(R.string.extension, vm.previousNote.fileExtension().text)
-                )
-                Text(
-                    modifier = Modifier
-                        .padding(10.dp),
-                    text = stringResource(
-                        R.string.parent_path,
-                        getParentPath(vm.previousNote.relativePath)
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp)
+                        .padding(bottom = 20.dp)
+                ) {
+                    Text(
+                        modifier = Modifier.padding(vertical = 8.dp),
+                        text = stringResource(R.string.search_and_replace)
                     )
-                )
+
+                    OutlinedTextField(
+                        modifier = Modifier.fillMaxWidth(),
+                        value = findText.value,
+                        onValueChange = { findText.value = it },
+                        label = { Text(stringResource(R.string.find_text)) },
+                        singleLine = true,
+                    )
+
+                    OutlinedTextField(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 8.dp),
+                        value = replaceText.value,
+                        onValueChange = { replaceText.value = it },
+                        label = { Text(stringResource(R.string.replace_with)) },
+                        singleLine = true,
+                        enabled = !isReadOnlyModeActive,
+                    )
+
+                    Text(
+                        modifier = Modifier.padding(top = 8.dp),
+                        text = stringResource(R.string.matches_count, matchCount)
+                    )
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Button(
+                            onClick = { vm.findNext(findText.value) },
+                            enabled = findText.value.isNotEmpty() && matchCount > 0,
+                        ) {
+                            Text(stringResource(R.string.find_next))
+                        }
+
+                        Button(
+                            modifier = Modifier.padding(start = 8.dp),
+                            onClick = {
+                                vm.replaceCurrent(
+                                    query = findText.value,
+                                    replacement = replaceText.value
+                                )
+                            },
+                            enabled = !isReadOnlyModeActive &&
+                                findText.value.isNotEmpty() &&
+                                matchCount > 0,
+                        ) {
+                            Text(stringResource(R.string.replace_current))
+                        }
+                    }
+
+                    Button(
+                        modifier = Modifier.padding(top = 8.dp),
+                        onClick = {
+                            vm.replaceAll(
+                                query = findText.value,
+                                replacement = replaceText.value
+                            )
+                        },
+                        enabled = !isReadOnlyModeActive &&
+                            findText.value.isNotEmpty() &&
+                            matchCount > 0,
+                    ) {
+                        Text(stringResource(R.string.replace_all))
+                    }
+
+                    Text(
+                        modifier = Modifier.padding(top = 16.dp),
+                        text = stringResource(
+                            R.string.extension,
+                            vm.previousNote.fileExtension().text
+                        )
+                    )
+                    Text(
+                        modifier = Modifier.padding(top = 6.dp),
+                        text = stringResource(
+                            R.string.parent_path,
+                            getParentPath(vm.previousNote.relativePath)
+                        )
+                    )
+                }
             }
         }
 
