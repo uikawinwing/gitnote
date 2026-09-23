@@ -170,6 +170,7 @@ fun GridScreen(
                 syncState = vm.syncState.collectAsState().value,
                 consumeOkSyncState = vm::consumeOkSyncState,
                 isReadOnlyModeActive = vm.prefs.isReadOnlyModeActive.getAsState().value,
+                showNotePreview = vm.prefs.showNotePreview.getAsState().value,
                 updateSettings = vm::updateSettings,
                 unselectAllNotes = vm::unselectAllNotes,
                 deleteSelectedNotes = vm::deleteSelectedNotes,
@@ -205,6 +206,7 @@ private fun GridView(
     })
 
     val showFullPathOfNotes = vm.prefs.showFullPathOfNotes.getAsState()
+    val showNotePreview = vm.prefs.showNotePreview.getAsState()
 
     Box {
 
@@ -230,6 +232,7 @@ private fun GridView(
                     modifier = commonModifier,
                     selectedNotes = selectedNotes,
                     showFullPathOfNotes = showFullPathOfNotes.value,
+                    showNotePreview = showNotePreview.value,
                     onEditClick = onEditClick,
                     vm = vm,
                 )
@@ -277,6 +280,7 @@ private fun GridNotesView(
     modifier: Modifier = Modifier,
     selectedNotes: List<Note>,
     showFullPathOfNotes: Boolean,
+    showNotePreview: Boolean,
     onEditClick: (Note, EditType) -> Unit,
     vm: GridViewModel,
 ) {
@@ -307,6 +311,7 @@ private fun GridNotesView(
                 onEditClick = onEditClick,
                 selectedNotes = selectedNotes,
                 showFullPathOfNotes = showFullPathOfNotes,
+                showNotePreview = showNotePreview,
                 showFullNoteHeight = showFullNoteHeight.value,
                 modifier = Modifier.padding(3.dp)
             )
@@ -325,6 +330,7 @@ private fun NoteCard(
     onEditClick: (Note, EditType) -> Unit,
     selectedNotes: List<Note>,
     showFullPathOfNotes: Boolean,
+    showNotePreview: Boolean,
     showFullNoteHeight: Boolean,
     modifier: Modifier = Modifier,
 ) {
@@ -424,29 +430,31 @@ private fun NoteCard(
                     )
                 }
 
-                if (gridNote.note.fileExtension() is FileExtension.Md) {
+                if (showNotePreview) {
+                    if (gridNote.note.fileExtension() is FileExtension.Md) {
 
-                    MarkdownCustom(
-                        content = gridNote.note.content,
-                        onClick = {
-                            if (selectedNotes.isEmpty()) {
-                                onEditClick(
-                                    gridNote.note, EditType.Update
-                                )
-                            } else {
-                                vm.selectNote(
-                                    gridNote.note, add = !gridNote.selected
-                                )
+                        MarkdownCustom(
+                            content = gridNote.note.content,
+                            onClick = {
+                                if (selectedNotes.isEmpty()) {
+                                    onEditClick(
+                                        gridNote.note, EditType.Update
+                                    )
+                                } else {
+                                    vm.selectNote(
+                                        gridNote.note, add = !gridNote.selected
+                                    )
+                                }
                             }
-                        }
-                    )
-                } else {
-                    Text(
-                        text = gridNote.note.content,
-                        modifier = Modifier,
-                        overflow = TextOverflow.Ellipsis,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
+                        )
+                    } else {
+                        Text(
+                            text = gridNote.note.content,
+                            modifier = Modifier,
+                            overflow = TextOverflow.Ellipsis,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
                 }
             }
         }
