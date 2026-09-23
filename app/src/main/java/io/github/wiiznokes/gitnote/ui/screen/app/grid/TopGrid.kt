@@ -546,6 +546,7 @@ private fun TopBarPreview() {
         syncState = SyncState.Error("hello"),
         consumeOkSyncState = {},
         isReadOnlyModeActive = true,
+        showNotePreview = true,
         updateSettings = { },
         selectedNotesNumber = 0,
         unselectAllNotes = { },
