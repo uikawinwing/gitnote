@@ -16,15 +16,17 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
@@ -100,19 +102,13 @@ fun StructuredTextEditor(
                         )
                     }
 
-                    val lines = remember(textContent.text) {
-                        textContent.text.split("\n")
+                    val editorLines = remember(textContent.text) {
+                        splitLinesWithOffsets(textContent.text)
                     }
                     val indentUnit = remember(textContent.text) {
-                        detectIndentUnit(lines)
+                        detectIndentUnit(editorLines.map { it.text })
                     }
-                    val textMeasurer = rememberTextMeasurer()
-                    val spaceWidthPx = remember(fontSize) {
-                        textMeasurer.measure(
-                            text = " ",
-                            style = textStyle,
-                        ).size.width.toFloat()
-                    }
+                    var textLayout by remember { mutableStateOf<TextLayoutResult?>(null) }
                     val rainbow = remember {
                         listOf(
                             Color(0xFFFF6B6B),
@@ -134,40 +130,51 @@ fun StructuredTextEditor(
                             modifier = Modifier
                                 .widthIn(min = minEditorWidth)
                                 .heightIn(min = minEditorHeight)
+                                .padding(horizontal = 10.dp, vertical = 12.dp)
                                 .drawBehind {
-                                    if (showIndentGuides) {
-                                        val topPadding = 12.dp.toPx()
-                                        val leftPadding = 10.dp.toPx()
-                                        val lineHeightPx = with(this) {
-                                            (fontSize * 1.55f).sp.toPx()
-                                        }
-                                        lines.forEachIndexed { lineIndex, line ->
-                                            val indentation = indentationOf(line, indentUnit)
-                                            if (indentation.depth <= 0) return@forEachIndexed
+                                    val layout = textLayout
+                                    if (showIndentGuides && layout != null) {
+                                        editorLines.forEach { editorLine ->
+                                            val indentation = indentationOf(editorLine.text, indentUnit)
+                                            if (indentation.guideOffsets.isEmpty()) return@forEach
 
-                                            val yStart = topPadding + lineIndex * lineHeightPx
-                                            val yEnd = yStart + lineHeightPx
-
-                                            for (level in 1..indentation.depth.coerceAtMost(12)) {
-                                                val column = indentation.guideColumns[level - 1]
-                                                val x = leftPadding + (column * spaceWidthPx) - (spaceWidthPx * 0.5f)
-                                                drawLine(
-                                                    color = rainbow[(level - 1) % rainbow.size].copy(alpha = 0.52f),
-                                                    start = androidx.compose.ui.geometry.Offset(x, yStart),
-                                                    end = androidx.compose.ui.geometry.Offset(x, yEnd),
-                                                    strokeWidth = 1.dp.toPx(),
-                                                )
+                                            val firstVisualLine =
+                                                layout.getLineForOffset(editorLine.startOffset)
+                                            val lastOffset = if (editorLine.endOffset > editorLine.startOffset) {
+                                                editorLine.endOffset - 1
+                                            } else {
+                                                editorLine.startOffset
                                             }
+                                            val lastVisualLine = layout.getLineForOffset(lastOffset)
+                                            val yStart = layout.getLineTop(firstVisualLine)
+                                            val yEnd = layout.getLineBottom(lastVisualLine)
+
+                                            indentation.guideOffsets
+                                                .take(12)
+                                                .forEachIndexed { levelIndex, localOffset ->
+                                                    val globalOffset =
+                                                        (editorLine.startOffset + localOffset)
+                                                            .coerceAtMost(editorLine.endOffset)
+                                                    val x = layout.getCursorRect(globalOffset).left
+
+                                                    drawLine(
+                                                        color = rainbow[levelIndex % rainbow.size]
+                                                            .copy(alpha = 0.48f),
+                                                        start = androidx.compose.ui.geometry.Offset(x, yStart),
+                                                        end = androidx.compose.ui.geometry.Offset(x, yEnd),
+                                                        strokeWidth = 1.dp.toPx(),
+                                                    )
+                                                }
                                         }
                                     }
                                 }
-                                .padding(horizontal = 10.dp, vertical = 12.dp)
                                 .focusRequester(textFocusRequester),
                             value = textContent,
                             onValueChange = { vm.onValueChange(it) },
                             readOnly = isReadOnlyModeActive,
                             textStyle = textStyle,
                             cursorBrush = SolidColor(MaterialTheme.colorScheme.onBackground),
+                            onTextLayout = { textLayout = it },
                         )
                     }
                 }
@@ -189,65 +196,88 @@ fun StructuredTextEditor(
     }
 }
 
-private data class Indentation(
-    val depth: Int,
-    val guideColumns: List<Int>,
+private data class EditorLine(
+    val text: String,
+    val startOffset: Int,
+    val endOffset: Int,
 )
 
+private data class Indentation(
+    val guideOffsets: List<Int>,
+)
+
+private fun splitLinesWithOffsets(text: String): List<EditorLine> {
+    val result = mutableListOf<EditorLine>()
+    var start = 0
+
+    text.forEachIndexed { index, char ->
+        if (char == '\n') {
+            result += EditorLine(
+                text = text.substring(start, index),
+                startOffset = start,
+                endOffset = index,
+            )
+            start = index + 1
+        }
+    }
+
+    result += EditorLine(
+        text = text.substring(start),
+        startOffset = start,
+        endOffset = text.length,
+    )
+    return result
+}
+
 /**
- * Infer whether this file mainly uses 2-space or 4-space indentation.
- * Tabs are treated as explicit levels and do not affect the space-indent guess.
+ * Infer indentation from the file itself instead of assuming 2 or 4 spaces.
+ * The greatest common divisor of actual leading-space widths becomes one level.
  */
 private fun detectIndentUnit(lines: List<String>): Int {
-    val indents = lines.mapNotNull { line ->
+    val widths = lines.mapNotNull { line ->
         if (line.isBlank() || line.startsWith("\t")) return@mapNotNull null
         val spaces = line.takeWhile { it == ' ' }.length
         spaces.takeIf { it > 0 }
     }
 
-    if (indents.isEmpty()) return 4
+    if (widths.isEmpty()) return 4
 
-    val divisibleBy4 = indents.count { it % 4 == 0 }
-    val divisibleBy2 = indents.count { it % 2 == 0 }
+    val unit = widths.reduce(::greatestCommonDivisor)
+    return unit.coerceIn(1, 8)
+}
 
-    return if (
-        divisibleBy4 > 0 &&
-        divisibleBy4 * 4 >= indents.size * 3 &&
-        divisibleBy4 >= divisibleBy2 - 1
-    ) {
-        4
-    } else {
-        2
+private fun greatestCommonDivisor(a: Int, b: Int): Int {
+    var x = a
+    var y = b
+    while (y != 0) {
+        val remainder = x % y
+        x = y
+        y = remainder
     }
+    return x
 }
 
 private fun indentationOf(line: String, indentUnit: Int): Indentation {
-    if (line.isBlank()) return Indentation(0, emptyList())
+    if (line.isBlank()) return Indentation(emptyList())
 
-    var columns = 0
-    var tabLevels = 0
-    var spaces = 0
+    val guideOffsets = mutableListOf<Int>()
+    var visualColumns = 0
+    var nextGuideColumn = indentUnit
 
-    for (char in line) {
+    for ((index, char) in line.withIndex()) {
         when (char) {
-            ' ' -> {
-                spaces += 1
-                columns += 1
-            }
-            '\t' -> {
-                tabLevels += 1
-                columns += indentUnit
-            }
+            ' ' -> visualColumns += 1
+            '\t' -> visualColumns += indentUnit
             else -> break
+        }
+
+        while (visualColumns >= nextGuideColumn) {
+            guideOffsets += index + 1
+            nextGuideColumn += indentUnit
         }
     }
 
-    val spaceLevels = spaces / indentUnit
-    val depth = tabLevels + spaceLevels
-    if (depth <= 0) return Indentation(0, emptyList())
-
-    val guideColumns = (1..depth).map { level -> level * indentUnit }
-    return Indentation(depth, guideColumns)
+    return Indentation(guideOffsets)
 }
 
 private fun validateTextStructure(extension: String, text: String): StructureStatus? {
