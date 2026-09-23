@@ -103,6 +103,9 @@ fun StructuredTextEditor(
                     val lines = remember(textContent.text) {
                         textContent.text.split("\n")
                     }
+                    val indentUnit = remember(textContent.text) {
+                        detectIndentUnit(lines)
+                    }
                     val textMeasurer = rememberTextMeasurer()
                     val spaceWidthPx = remember(fontSize) {
                         textMeasurer.measure(
@@ -138,22 +141,21 @@ fun StructuredTextEditor(
                                         val lineHeightPx = with(this) {
                                             (fontSize * 1.55f).sp.toPx()
                                         }
-                                        val strokeWidth = 1.4.dp.toPx()
-
                                         lines.forEachIndexed { lineIndex, line ->
-                                            val depth = indentDepth(line)
-                                            if (depth <= 0) return@forEachIndexed
+                                            val indentation = indentationOf(line, indentUnit)
+                                            if (indentation.depth <= 0) return@forEachIndexed
 
                                             val yStart = topPadding + lineIndex * lineHeightPx
                                             val yEnd = yStart + lineHeightPx
 
-                                            for (level in 1..depth.coerceAtMost(12)) {
-                                                val x = leftPadding + (level * 2 * spaceWidthPx) - (spaceWidthPx * 0.55f)
+                                            for (level in 1..indentation.depth.coerceAtMost(12)) {
+                                                val column = indentation.guideColumns[level - 1]
+                                                val x = leftPadding + (column * spaceWidthPx) - (spaceWidthPx * 0.5f)
                                                 drawLine(
-                                                    color = rainbow[(level - 1) % rainbow.size].copy(alpha = 0.78f),
+                                                    color = rainbow[(level - 1) % rainbow.size].copy(alpha = 0.52f),
                                                     start = androidx.compose.ui.geometry.Offset(x, yStart),
                                                     end = androidx.compose.ui.geometry.Offset(x, yEnd),
-                                                    strokeWidth = strokeWidth,
+                                                    strokeWidth = 1.dp.toPx(),
                                                 )
                                             }
                                         }
@@ -187,17 +189,65 @@ fun StructuredTextEditor(
     }
 }
 
-private fun indentDepth(line: String): Int {
+private data class Indentation(
+    val depth: Int,
+    val guideColumns: List<Int>,
+)
+
+/**
+ * Infer whether this file mainly uses 2-space or 4-space indentation.
+ * Tabs are treated as explicit levels and do not affect the space-indent guess.
+ */
+private fun detectIndentUnit(lines: List<String>): Int {
+    val indents = lines.mapNotNull { line ->
+        if (line.isBlank() || line.startsWith("\t")) return@mapNotNull null
+        val spaces = line.takeWhile { it == ' ' }.length
+        spaces.takeIf { it > 0 }
+    }
+
+    if (indents.isEmpty()) return 4
+
+    val divisibleBy4 = indents.count { it % 4 == 0 }
+    val divisibleBy2 = indents.count { it % 2 == 0 }
+
+    return if (
+        divisibleBy4 > 0 &&
+        divisibleBy4 * 4 >= indents.size * 3 &&
+        divisibleBy4 >= divisibleBy2 - 1
+    ) {
+        4
+    } else {
+        2
+    }
+}
+
+private fun indentationOf(line: String, indentUnit: Int): Indentation {
+    if (line.isBlank()) return Indentation(0, emptyList())
+
+    var columns = 0
+    var tabLevels = 0
     var spaces = 0
-    var tabs = 0
+
     for (char in line) {
         when (char) {
-            ' ' -> spaces += 1
-            '\t' -> tabs += 1
+            ' ' -> {
+                spaces += 1
+                columns += 1
+            }
+            '\t' -> {
+                tabLevels += 1
+                columns += indentUnit
+            }
             else -> break
         }
     }
-    return tabs + (spaces / 2)
+
+    val spaceLevels = spaces / indentUnit
+    val depth = tabLevels + spaceLevels
+    if (depth <= 0) return Indentation(0, emptyList())
+
+    val guideColumns = (1..depth).map { level -> level * indentUnit }
+    return Indentation(depth, guideColumns)
 }
 
 private fun validateTextStructure(extension: String, text: String): StructureStatus? {
