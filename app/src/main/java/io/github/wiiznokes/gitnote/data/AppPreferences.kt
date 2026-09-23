@@ -137,6 +137,7 @@ class AppPreferences(
 
     val noteMinWidth = enumPreference("noteMinWidth", NoteMinWidth.Default)
     val showFullNoteHeight = booleanPreference("showFullNoteHeight", false)
+    val showNotePreview = booleanPreference("showNotePreview", true)
     val noteViewType = enumPreference("noteViewType", NoteViewType.Grid)
 
     val rememberLastOpenedFolder = booleanPreference("rememberLastOpenedFolder", false)
