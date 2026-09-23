@@ -174,4 +174,11 @@
 
     <string name="show_note_preview">Show note previews</string>
     <string name="hide_note_preview">Hide note previews</string>
+    <string name="search_and_replace">Search &amp; replace</string>
+    <string name="find_text">Find</string>
+    <string name="replace_with">Replace with</string>
+    <string name="find_next">Find next</string>
+    <string name="replace_current">Replace</string>
+    <string name="replace_all">Replace all</string>
+    <string name="matches_count">%1$d matches</string>
 </resources>
