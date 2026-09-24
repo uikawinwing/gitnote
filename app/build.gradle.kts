@@ -129,6 +129,12 @@ android {
         checkReleaseBuilds = false
     }
 
+    packaging {
+        resources {
+            excludes += "META-INF/INDEX.LIST"
+        }
+    }
+
 }
 
 ksp {
