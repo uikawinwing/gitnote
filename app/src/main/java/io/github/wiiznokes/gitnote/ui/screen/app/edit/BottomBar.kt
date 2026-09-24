@@ -3,6 +3,7 @@ package io.github.wiiznokes.gitnote.ui.screen.app.edit
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.scrollable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -18,13 +19,18 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -33,8 +39,13 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import io.github.wiiznokes.gitnote.R
+import io.github.wiiznokes.gitnote.data.TokenCounterMode
 import io.github.wiiznokes.gitnote.ui.viewmodel.edit.TextVM
 import io.github.wiiznokes.gitnote.utils.getParentPath
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 val bottomBarHeight = 50.dp
 
@@ -60,6 +71,7 @@ fun DefaultRow(
                 .align(Alignment.BottomStart),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            TokenCountSwitch(vm)
             leftContent()
         }
 
@@ -204,6 +216,68 @@ fun DefaultRow(
     }
 }
 
+
+
+@Composable
+private fun TokenCountSwitch(vm: TextVM) {
+    val mode = vm.prefs.tokenCounterMode.getAsState().value
+    val text = vm.content.value.text
+    val scope = rememberCoroutineScope()
+    val tokenCount = remember(mode) { mutableStateOf<Int?>(null) }
+    val failed = remember(mode) { mutableStateOf(false) }
+
+    LaunchedEffect(text, mode) {
+        failed.value = false
+
+        if (text.isEmpty()) {
+            tokenCount.value = 0
+            return@LaunchedEffect
+        }
+
+        tokenCount.value = null
+        delay(250)
+
+        val result = withContext(
+            if (mode == TokenCounterMode.Gemini) Dispatchers.IO else Dispatchers.Default
+        ) {
+            runCatching { TextTokenCounter.count(text, mode) }
+        }
+
+        tokenCount.value = result.getOrNull()
+        failed.value = result.isFailure
+    }
+
+    val modeLabel = when (mode) {
+        TokenCounterMode.Generic -> "Generic"
+        TokenCounterMode.Gemini -> "Gemini"
+    }
+    val countLabel = when {
+        tokenCount.value != null -> tokenCount.value.toString()
+        failed.value -> "—"
+        else -> "…"
+    }
+
+    TextButton(
+        modifier = Modifier.height(36.dp),
+        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
+        onClick = {
+            val nextMode = when (mode) {
+                TokenCounterMode.Generic -> TokenCounterMode.Gemini
+                TokenCounterMode.Gemini -> TokenCounterMode.Generic
+            }
+
+            scope.launch {
+                vm.prefs.tokenCounterMode.update(nextMode)
+            }
+        }
+    ) {
+        Text(
+            text = "$modeLabel · $countLabel",
+            style = MaterialTheme.typography.labelSmall,
+            maxLines = 1,
+        )
+    }
+}
 
 @Composable
 fun SmallSeparator(

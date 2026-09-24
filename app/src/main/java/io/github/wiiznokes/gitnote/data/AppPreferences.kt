@@ -150,6 +150,7 @@ class AppPreferences(
     val editorFontSize = intPreference("editorFontSize", 16)
     val showIndentGuides = booleanPreference("showIndentGuides", true)
     val validateTextStructure = booleanPreference("validateTextStructure", true)
+    val tokenCounterMode = enumPreference("tokenCounterMode", TokenCounterMode.Generic)
 
     val folderFilters = setPreference(
         "folderFilters", setOf(
@@ -189,4 +190,9 @@ class AppPreferences(
 enum class StorageConfig {
     App,
     Device
+}
+
+enum class TokenCounterMode {
+    Generic,
+    Gemini
 }

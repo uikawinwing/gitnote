@@ -181,6 +181,10 @@ dependencies {
     implementation(libs.reimagined.navigation)
     implementation("org.yaml:snakeyaml:2.4")
 
+    // Token counting
+    implementation("com.knuddels:jtokkit:1.1.0")
+    implementation("com.google.genai:google-genai:1.73.0")
+
     // Markdown
     implementation(libs.compose.markdown.core)
     implementation(libs.compose.markdown.renderer)
