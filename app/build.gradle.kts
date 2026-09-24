@@ -131,7 +131,10 @@ android {
 
     packaging {
         resources {
-            excludes += "META-INF/INDEX.LIST"
+            excludes += setOf(
+                "META-INF/INDEX.LIST",
+                "META-INF/DEPENDENCIES"
+            )
         }
     }
 
