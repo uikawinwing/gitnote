@@ -129,6 +129,15 @@ android {
         checkReleaseBuilds = false
     }
 
+    packaging {
+        resources {
+            excludes += setOf(
+                "META-INF/INDEX.LIST",
+                "META-INF/DEPENDENCIES"
+            )
+        }
+    }
+
 }
 
 ksp {
@@ -179,6 +188,11 @@ dependencies {
 
     // Compose Navigation
     implementation(libs.reimagined.navigation)
+    implementation("org.yaml:snakeyaml:2.4")
+
+    // Token counting
+    implementation("com.knuddels:jtokkit:1.1.0")
+    implementation("com.google.genai:google-genai:1.73.0")
 
     // Markdown
     implementation(libs.compose.markdown.core)

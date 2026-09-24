@@ -113,7 +113,7 @@ const _OPEN_REPO_LIB_METHOD: NativeMethod = native_method! {
 const _CLONE_REPO_LIB_METHOD: NativeMethod = native_method! {
     java_type = "io.github.wiiznokes.gitnote.manager.GitManagerKt",
     export = "Java_io_github_wiiznokes_gitnote_manager_GitManagerKt_cloneRepoLib",
-    static extern fn clone_repo_lib(repo_path: JString, remote_url: JString, cred: JObject, progress_callback: JObject) -> jint,
+    static extern fn clone_repo_lib(repo_path: JString, remote_url: JString, branch: JString, cred: JObject, progress_callback: JObject) -> jint,
 };
 
 const _LAST_COMMIT_LIB_METHOD: NativeMethod = native_method! {
@@ -406,11 +406,17 @@ fn clone_repo_lib<'local>(
     _class: JClass<'local>,
     repo_path: JString<'local>,
     remote_url: JString<'local>,
+    branch: JString<'local>,
     cred: JObject<'local>,
     progress_callback: JObject<'local>,
 ) -> Result<jint, jni::errors::Error> {
     let repo_path = repo_path.try_to_string(env).unwrap();
     let remote_url = remote_url.try_to_string(env).unwrap();
+    let branch = if branch.is_null() {
+        None
+    } else {
+        Some(branch.try_to_string(env).unwrap())
+    };
 
     let cred = match Cred::from_jni(env, &cred) {
         Ok(cred) => cred,
@@ -423,7 +429,7 @@ fn clone_repo_lib<'local>(
     let cb = JniProgressCB::new(env, progress_callback);
 
     unwrap_or_log!(
-        libgit2::clone_repo(&repo_path, &remote_url, cred, cb),
+        libgit2::clone_repo(&repo_path, &remote_url, branch.as_deref(), cred, cb),
         "clone_repo"
     );
 

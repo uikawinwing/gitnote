@@ -169,6 +169,7 @@ fn credential_helper(
 pub fn clone_repo(
     repo_path: &str,
     remote_url: &str,
+    branch: Option<&str>,
     cred: Option<Cred>,
     mut cb: impl ProgressCB,
 ) -> Result<(), Error> {
@@ -196,9 +197,12 @@ pub fn clone_repo(
         .download_tags(git2::AutotagOption::None);
 
     let mut builder = git2::build::RepoBuilder::new();
+    builder.fetch_options(fetch_options);
+    if let Some(branch) = branch.filter(|branch| !branch.is_empty()) {
+        builder.branch(branch);
+    }
 
     let repo = builder
-        .fetch_options(fetch_options)
         .clone(remote_url, std::path::Path::new(&repo_path))
         .map_err(|e| Error::git2(e, "clone"))?;
 

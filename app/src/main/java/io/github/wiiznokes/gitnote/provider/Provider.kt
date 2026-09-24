@@ -10,6 +10,7 @@ data class RepoInfo(
     val owner: String,
     val url: String,
     val lastModifiedTimeMillis: Long,
+    val defaultBranch: String = "main",
 ) {
     val fullRepoName = "$owner/$name"
 }

@@ -24,13 +24,17 @@ import androidx.compose.material.icons.filled.FormatQuote
 import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.Title
 import androidx.compose.runtime.Composable
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.mikepenz.markdown.m3.Markdown
+import com.mikepenz.markdown.m3.markdownTypography
 import io.github.wiiznokes.gitnote.ui.viewmodel.edit.MarkDownVM
 
 @Composable
@@ -41,6 +45,8 @@ fun MarkDownContent(
     isReadOnlyModeActive: Boolean,
     textContent: TextFieldValue,
 ) {
+    val editorFontSize by vm.prefs.editorFontSize.getAsState()
+
     if (isReadOnlyModeActive) {
         Box(
             modifier = Modifier
@@ -48,10 +54,28 @@ fun MarkDownContent(
                 .verticalScroll(rememberScrollState())
         ) {
             SelectionContainer {
+                val base = MaterialTheme.typography.bodyLarge.copy(
+                    fontSize = editorFontSize.sp,
+                    lineHeight = (editorFontSize * 1.55f).sp,
+                )
                 Markdown(
                     modifier = Modifier
                         .padding(15.dp),
                     content = textContent.text,
+                    typography = markdownTypography(
+                        h1 = base.copy(fontSize = (editorFontSize * 1.55f).sp),
+                        h2 = base.copy(fontSize = (editorFontSize * 1.4f).sp),
+                        h3 = base.copy(fontSize = (editorFontSize * 1.28f).sp),
+                        h4 = base.copy(fontSize = (editorFontSize * 1.18f).sp),
+                        h5 = base.copy(fontSize = (editorFontSize * 1.1f).sp),
+                        h6 = base,
+                        text = base,
+                        paragraph = base,
+                        ordered = base,
+                        bullet = base,
+                        list = base,
+                        table = base,
+                    )
                 )
             }
         }
@@ -60,7 +84,8 @@ fun MarkDownContent(
             vm = vm,
             textFocusRequester = textFocusRequester,
             onFinished = onFinished,
-            textContent = textContent
+            textContent = textContent,
+            extension = "md",
         )
     }
 }

@@ -110,6 +110,7 @@ class GitManager {
     suspend fun cloneRepo(
         repoPath: String,
         repoUrl: String,
+        branch: String? = null,
         cred: Cred?,
         progressCallback: (Int) -> Boolean
     ): Result<Unit> = safelyAccessLibGit2 {
@@ -122,6 +123,7 @@ class GitManager {
         val res = cloneRepoLib(
             repoPath = repoPath,
             remoteUrl = repoUrl,
+            branch = branch,
             cred = cred,
             progressCallback = this
         )
@@ -241,6 +243,7 @@ private external fun openRepoLib(repoPath: String): Int
 private external fun cloneRepoLib(
     repoPath: String,
     remoteUrl: String,
+    branch: String?,
     cred: Cred?,
     progressCallback: GitManager
 ): Int

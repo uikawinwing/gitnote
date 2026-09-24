@@ -251,6 +251,19 @@ interface RepoDatabaseDao {
         return this.gridDrawerFoldersRaw(query)
     }
 
+    fun drawerFolderTree(): Flow<List<DrawerFolderModel>> {
+        val sql = """
+            SELECT f.relativePath, f.id, COUNT(n.relativePath) as noteCount
+            FROM NoteFolders AS f
+            LEFT JOIN Notes AS n ON n.relativePath LIKE f.relativePath || '/%'
+            WHERE f.relativePath != ''
+            GROUP BY f.relativePath, f.id
+            ORDER BY f.relativePath COLLATE NOCASE ASC
+        """.trimIndent()
+
+        return this.gridDrawerFoldersRaw(SimpleSQLiteQuery(sql))
+    }
+
     @RawQuery(observedEntities = [Note::class, NoteFolder::class])
     fun noteFoldersRaw(query: SupportSQLiteQuery): Flow<List<NoteFolder>>
 

@@ -29,7 +29,10 @@
     <string name="folder_filters_subtitle">Define regex to filter folders of the repository</string>
     <string name="edit">Edit</string>
     <string name="default_note_extension">Default extension for notes</string>
-    <string name="show_lines_number">Show lines number</string>
+    <string name="show_lines_number">Show line numbers</string>
+    <string name="editor_font_size">Editor font size</string>
+    <string name="show_indent_guides">Show indentation guides</string>
+    <string name="validate_text_structure">Validate Markdown / YAML structure</string>
     <string name="repository">Repository</string>
     <string name="password">Password</string>
     <string name="username">Username</string>
@@ -169,4 +172,13 @@
     <string name="confirmation_quit_edit_dialog">Are you sure you want to quit ? You will lose all changes.</string>
     <string name="warning_folder_deletion">WARNING: Are you sure you want to continue? The directory will be deleted.</string>
 
+    <string name="show_note_preview">Show note previews</string>
+    <string name="hide_note_preview">Hide note previews</string>
+    <string name="search_and_replace">Search &amp; replace</string>
+    <string name="find_text">Find</string>
+    <string name="replace_with">Replace with</string>
+    <string name="find_next">Find next</string>
+    <string name="replace_current">Replace</string>
+    <string name="replace_all">Replace all</string>
+    <string name="matches_count">%1$d matches</string>
 </resources>
