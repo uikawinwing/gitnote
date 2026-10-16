@@ -140,6 +140,10 @@ class AppPreferences(
     val showNotePreview = booleanPreference("showNotePreview", true)
     val noteViewType = enumPreference("noteViewType", NoteViewType.Grid)
 
+    // UI-only folder metadata: never change files, .gitignore, or Git sync behavior.
+    val pinnedFolderKeys = setPreference("pinnedFolderKeys", emptySet<String>())
+    val hiddenFolderKeys = setPreference("hiddenFolderKeys", emptySet<String>())
+
     val rememberLastOpenedFolder = booleanPreference("rememberLastOpenedFolder", false)
     val lastOpenedFolder = stringPreference("lastOpenedFolder", "")
 
