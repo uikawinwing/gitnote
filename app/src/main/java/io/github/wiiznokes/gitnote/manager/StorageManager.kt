@@ -7,6 +7,8 @@ import io.github.wiiznokes.gitnote.data.AppPreferences
 import io.github.wiiznokes.gitnote.data.room.Note
 import io.github.wiiznokes.gitnote.data.room.NoteFolder
 import io.github.wiiznokes.gitnote.data.room.RepoDatabase
+import java.nio.file.FileAlreadyExistsException
+import java.nio.file.NoSuchFileException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.sync.Mutex
@@ -164,32 +166,40 @@ class StorageManager {
         update(
             commitMessage = "gitnote modified ${previous.relativePath}"
         ) {
-            dao.removeNote(previous)
-            dao.insertNote(new)
-
             val rootPath = prefs.repoPath()
             val previousFile = previous.toFileFs(rootPath)
-
-            previousFile.delete().onFailure {
-                val message =
-                    uiHelper.getString(R.string.error_delete_file, previousFile.path, it.message)
-                Log.e(TAG, message)
-                uiHelper.makeToast(message)
-            }
-
             val newFile = new.toFileFs(rootPath)
-            newFile.create().onFailure {
-                val message = uiHelper.getString(R.string.error_create_file, it.message)
-                Log.e(TAG, message)
-                uiHelper.makeToast(message)
+            val sameFile = previousFile.path == newFile.path
+
+            if (!previousFile.exist()) {
+                return@update failure(NoSuchFileException(previousFile.path))
+            }
+            if (!sameFile && newFile.exist()) {
+                return@update failure(FileAlreadyExistsException(newFile.path))
             }
 
-            newFile.write(new.content).onFailure {
-                val message = uiHelper.getString(R.string.error_write_file, it.message)
+            // Never delete the original before its replacement is safely written.
+            newFile.writeSafely(new.content).onFailure { error ->
+                val message = uiHelper.getString(R.string.error_write_file, error.message)
                 Log.e(TAG, message)
                 uiHelper.makeToast(message)
+                return@update failure(error)
             }
 
+            // On a rename, the old file is removed only after the new file exists.
+            if (!sameFile) {
+                previousFile.delete().onFailure { error ->
+                    val message = uiHelper.getString(
+                        R.string.error_delete_file, previousFile.path, error.message
+                    )
+                    Log.e(TAG, message)
+                    uiHelper.makeToast(message)
+                    return@update failure(error)
+                }
+            }
+
+            dao.removeNote(previous)
+            dao.insertNote(new)
             success(Unit)
         }
 
@@ -204,21 +214,17 @@ class StorageManager {
         update(
             commitMessage = "gitnote created ${note.relativePath}"
         ) {
-            dao.insertNote(note)
-
             val file = note.toFileFs(prefs.repoPath())
-
-            file.create().onFailure {
-                val message = uiHelper.getString(R.string.error_create_file, it.message)
+            if (file.exist()) {
+                return@update failure(FileAlreadyExistsException(file.path))
+            }
+            file.writeSafely(note.content).onFailure { error ->
+                val message = uiHelper.getString(R.string.error_write_file, error.message)
                 Log.e(TAG, message)
                 uiHelper.makeToast(message)
+                return@update failure(error)
             }
-            file.write(note.content).onFailure {
-                val message = uiHelper.getString(R.string.error_write_file, it.message)
-                Log.e(TAG, message)
-                uiHelper.makeToast(message)
-            }
-
+            dao.insertNote(note)
             success(Unit)
         }
     }
