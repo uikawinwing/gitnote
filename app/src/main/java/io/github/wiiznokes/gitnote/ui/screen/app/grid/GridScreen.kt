@@ -119,14 +119,14 @@ fun GridScreen(
                 createNoteFolder = vm::createNoteFolder,
                 togglePinned = { path ->
                     vm.updateSettings {
-                        val key = folderPreferenceKey(repoPath(), path)
+                        val key = folderPreferenceKey(this.repoPath(), path)
                         val current = pinnedFolderKeys.get()
                         pinnedFolderKeys.update(if (key in current) current - key else current + key)
                     }
                 },
                 toggleHidden = { path ->
                     vm.updateSettings {
-                        val key = folderPreferenceKey(repoPath(), path)
+                        val key = folderPreferenceKey(this.repoPath(), path)
                         val current = hiddenFolderKeys.get()
                         hiddenFolderKeys.update(if (key in current) current - key else current + key)
                     }
