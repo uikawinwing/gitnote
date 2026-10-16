@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.material.icons.Icons
@@ -16,6 +17,7 @@ import androidx.compose.material.icons.filled.Done
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.TextFormat
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.IconButton
@@ -29,6 +31,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.surfaceColorAtElevation
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -42,6 +45,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import io.github.wiiznokes.gitnote.R
 import io.github.wiiznokes.gitnote.manager.ExtensionType
 import io.github.wiiznokes.gitnote.manager.extensionType
@@ -74,6 +80,17 @@ fun EditScreen(
         null -> throw Exception("file extension not supported, but present in the database?? $extension")
     }
 
+    // Persist a draft when Android backgrounds the editor; onCleared alone
+    // does not run when the OS later kills the process.
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner, vm) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_STOP) vm.saveDraft()
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
     val showShouldQuitDialog = rememberSaveable {
         mutableStateOf(false)
     }
@@ -88,6 +105,7 @@ fun EditScreen(
     )
 
     BackHandler {
+        if (vm.isSaving.value) return@BackHandler
         if (vm.isPreviousNoteTheSame()) {
             vm.shouldSaveWhenQuitting = false
             onFinished()
@@ -125,6 +143,7 @@ fun EditScreen(
                 navigationIcon = {
                     IconButton(
                         onClick = {
+                            if (vm.isSaving.value) return@IconButton
                             if (vm.isPreviousNoteTheSame()) {
                                 vm.shouldSaveWhenQuitting = false
                                 onFinished()
@@ -203,10 +222,18 @@ fun EditScreen(
                         vm.save(onSuccess = onFinished)
                     }
                 ) {
-                    SimpleIcon(
-                        imageVector = Icons.Default.Done,
-                        tint = MaterialTheme.colorScheme.onPrimary
-                    )
+                    if (vm.isSaving.value) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(22.dp),
+                            color = MaterialTheme.colorScheme.onPrimary,
+                            strokeWidth = 2.dp,
+                        )
+                    } else {
+                        SimpleIcon(
+                            imageVector = Icons.Default.Done,
+                            tint = MaterialTheme.colorScheme.onPrimary
+                        )
+                    }
                 }
             }
         }

@@ -32,11 +32,12 @@ class NoteSaver {
             try {
                 if (shouldSave) {
                     Log.d(TAG, "EDIT_IS_UNSAVED")
-                    writeObj(EDIT_IS_UNSAVED, true)
                     writeObj(EDIT_NAME, name)
                     writeObj(EDIT_CONTENT, content)
                     writeObj(EDIT_PREVIOUS_NOTE, previousNote)
                     writeObj(EDIT_EDIT_TYPE, editType)
+                    // Mark the draft ready only after every field has been written.
+                    writeObj(EDIT_IS_UNSAVED, true)
                 } else {
                     writeObj(EDIT_IS_UNSAVED, false)
                 }
@@ -79,11 +80,11 @@ fun save(
 ) {
     try {
         if (shouldSave) {
-            writeObj(EDIT_IS_UNSAVED, true)
             writeObj(EDIT_NAME, name)
             writeObj(EDIT_CONTENT, content)
             writeObj(EDIT_PREVIOUS_NOTE, previousNote)
             writeObj(EDIT_EDIT_TYPE, editType)
+            writeObj(EDIT_IS_UNSAVED, true)
         } else {
             writeObj(EDIT_IS_UNSAVED, false)
         }
