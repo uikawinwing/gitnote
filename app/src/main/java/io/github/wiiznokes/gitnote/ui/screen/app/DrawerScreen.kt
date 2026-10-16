@@ -161,7 +161,7 @@ fun DrawerScreen(
                                 }
                             )
                             .combinedClickable(
-                                onLongClick = { selectFolder(path) },
+                                onLongClick = { dropDownExpanded.value = true },
                                 onClick = { selectFolder(path) }
                             )
                             .pointerInteropFilter {
