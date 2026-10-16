@@ -28,6 +28,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.util.zip.DataFormatException
 import kotlin.Result.Companion.failure
 import kotlin.Result.Companion.success
@@ -75,6 +76,7 @@ open class TextVM() : ViewModel() {
 
 
     var shouldSaveWhenQuitting: Boolean = true
+    val isSaving = mutableStateOf(false)
 
     val shouldForceNotReadOnlyMode: MutableState<Boolean> = mutableStateOf(false)
 
@@ -356,43 +358,77 @@ open class TextVM() : ViewModel() {
     val prefs = MyApp.appModule.appPreferences
 
     fun save(onSuccess: () -> Unit = {}) {
+        if (isSaving.value) return
 
-        if (isPreviousNoteTheSame()) {
-            Log.d(TAG, "No modification")
+        if (editType == EditType.Update && isPreviousNoteTheSame()) {
+            shouldSaveWhenQuitting = false
+            NoteSaver.save(false, name.value.text, content.value.text, previousNote, editType)
             onSuccess()
             return
         }
 
-        when (editType) {
-            EditType.Create -> create(
-                parentPath = previousNote.parentPath(),
-                name = name.value.text,
-                fileExtension = previousNote.fileExtension(),
-                content = content.value.text,
-                id = previousNote.id
-            ).onSuccess {
-                editType = EditType.Update
-                previousNote = it
-                onSuccess()
+        val savedName = name.value.text
+        val savedContent = content.value.text
+        val savedPrevious = previousNote
+        val savedType = editType
+
+        // Keep a recoverable draft while the actual disk / Git operation is pending.
+        saveDraft()
+        isSaving.value = true
+        viewModelScope.launch {
+            val result = try {
+                when (savedType) {
+                    EditType.Create -> create(
+                        parentPath = savedPrevious.parentPath(),
+                        name = savedName,
+                        fileExtension = savedPrevious.fileExtension(),
+                        content = savedContent,
+                        id = savedPrevious.id,
+                    )
+                    EditType.Update -> update(
+                        previousNote = savedPrevious,
+                        parentPath = savedPrevious.parentPath(),
+                        name = savedName,
+                        fileExtension = savedPrevious.fileExtension(),
+                        content = savedContent,
+                    )
+                }
+            } catch (error: Exception) {
+                failure(error)
             }
 
-            EditType.Update -> update(
-                previousNote = previousNote,
-                parentPath = previousNote.parentPath(),
-                name = name.value.text,
-                fileExtension = previousNote.fileExtension(),
-                content = content.value.text,
-            ).onSuccess {
-                previousNote = it
-                onSuccess()
+            isSaving.value = false
+            result.onSuccess { savedNote ->
+                previousNote = savedNote
+                editType = EditType.Update
+                // Do not navigate away if the user changed the text during saving.
+                if (name.value.text == savedName && content.value.text == savedContent) {
+                    shouldSaveWhenQuitting = false
+                    NoteSaver.save(false, savedName, savedContent, savedNote, editType)
+                    onSuccess()
+                } else {
+                    saveDraft()
+                }
+            }.onFailure { error ->
+                uiHelper.makeToast(error.message)
+                saveDraft()
             }
         }
     }
 
-    /** Return early to not block the ui thread.
-     * This is a best effort to catch problem
-     */
-    private fun update(
+    fun saveDraft() {
+        NoteSaver.save(
+            shouldSave = shouldSaveWhenQuitting &&
+                (isSaving.value || editType == EditType.Create || !isPreviousNoteTheSame()),
+            name = name.value.text,
+            content = content.value.text,
+            previousNote = previousNote,
+            editType = editType,
+        )
+    }
+
+    /** Save completes only after the filesystem and Git operation succeeds. */
+    private suspend fun update(
         previousNote: Note,
         parentPath: String,
         name: String,
@@ -435,24 +471,15 @@ open class TextVM() : ViewModel() {
             }
         }
 
-        CoroutineScope(Dispatchers.IO).launch {
-
-            storageManager.updateNote(
-                new = newNote,
-                previous = previousNote
-            ).onFailure {
-                uiHelper.makeToast(it.message)
-                return@launch
-            }
-
-        }
-        return success(newNote)
+        return withContext(Dispatchers.IO) {
+            storageManager.updateNote(new = newNote, previous = previousNote)
+        }.map { newNote }
     }
 
     /** Return early to note block the ui thread.
      * This is a best effort to catch problem
      */
-    private fun create(
+    private suspend fun create(
         parentPath: String,
         name: String,
         fileExtension: FileExtension,
@@ -485,14 +512,9 @@ open class TextVM() : ViewModel() {
             return failure(EditException(EditExceptionType.NoteAlreadyExist))
         }
 
-        CoroutineScope(Dispatchers.IO).launch {
-            storageManager.createNote(note).onFailure {
-                uiHelper.makeToast(it.message)
-                return@launch
-            }
-        }
-
-        return success(note)
+        return withContext(Dispatchers.IO) {
+            storageManager.createNote(note)
+        }.map { note }
     }
 
     fun isPreviousNoteTheSame(): Boolean =
@@ -500,13 +522,7 @@ open class TextVM() : ViewModel() {
                 && previousNote.content == content.value.text
 
     override fun onCleared() {
-        NoteSaver.save(
-            shouldSave = shouldSaveWhenQuitting && !isPreviousNoteTheSame(),
-            name = name.value.text,
-            content = content.value.text,
-            previousNote = previousNote,
-            editType = editType
-        )
+        saveDraft()
     }
 }
 
