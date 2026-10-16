@@ -76,6 +76,8 @@ import io.github.wiiznokes.gitnote.ui.model.FileExtension
 import io.github.wiiznokes.gitnote.ui.model.GridNote
 import io.github.wiiznokes.gitnote.ui.model.NoteViewType
 import io.github.wiiznokes.gitnote.ui.screen.app.DrawerScreen
+import io.github.wiiznokes.gitnote.ui.screen.app.folderPathsForRepo
+import io.github.wiiznokes.gitnote.ui.screen.app.folderPreferenceKey
 import io.github.wiiznokes.gitnote.ui.viewmodel.GridViewModel
 
 
@@ -99,13 +101,36 @@ fun GridScreen(
 
     ModalNavigationDrawer(drawerState = drawerState, drawerContent = {
         ModalDrawerSheet {
+            val repoPath = vm.prefs.repoPathSafely()
+            val pinned = folderPathsForRepo(
+                repoPath, vm.prefs.pinnedFolderKeys.getAsState().value
+            )
+            val hidden = folderPathsForRepo(
+                repoPath, vm.prefs.hiddenFolderKeys.getAsState().value
+            )
             DrawerScreen(
                 drawerState = drawerState,
                 currentNoteFolderRelativePath = vm.currentNoteFolderRelativePath.collectAsState().value,
                 drawerFolders = vm.drawerFolders.collectAsState().value,
+                pinnedPaths = pinned,
+                hiddenPaths = hidden,
                 openFolder = vm::openFolder,
                 deleteFolder = vm::deleteFolder,
                 createNoteFolder = vm::createNoteFolder,
+                togglePinned = { path ->
+                    vm.updateSettings {
+                        val key = folderPreferenceKey(repoPath(), path)
+                        val current = pinnedFolderKeys.get()
+                        pinnedFolderKeys.update(if (key in current) current - key else current + key)
+                    }
+                },
+                toggleHidden = { path ->
+                    vm.updateSettings {
+                        val key = folderPreferenceKey(repoPath(), path)
+                        val current = hiddenFolderKeys.get()
+                        hiddenFolderKeys.update(if (key in current) current - key else current + key)
+                    }
+                },
             )
         }
     }) {
