@@ -28,5 +28,5 @@ fn basic() {
     })
     .unwrap();
 
-    clone_repo(repo_path, remote_url, cred, DummyProgressCB).unwrap();
+    clone_repo(repo_path, remote_url, None, cred, DummyProgressCB).unwrap();
 }

@@ -83,6 +83,9 @@ fun PickRepoScreen(
             val name = rememberSaveable(stateSaver = TextFieldValue.Saver) {
                 mutableStateOf(TextFieldValue(""))
             }
+            val branch = rememberSaveable(stateSaver = TextFieldValue.Saver) {
+                mutableStateOf(TextFieldValue(""))
+            }
 
             val nameText = name.value.text
 
@@ -210,6 +213,38 @@ fun PickRepoScreen(
 
             }
 
+            LaunchedEffect(selected.value, filteredRepos) {
+                val selectedRepo = (selected.value as? Selected.Index)
+                    ?.let { filteredRepos.getOrNull(it.index) }
+                if (selectedRepo != null) {
+                    branch.value = TextFieldValue(selectedRepo.defaultBranch)
+                } else {
+                    branch.value = TextFieldValue("")
+                }
+            }
+
+            if (selected.value is Selected.Index) {
+                OutlinedTextField(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 10.dp),
+                    value = branch.value,
+                    onValueChange = {
+                        branch.value = it
+                    },
+                    label = {
+                        Text(text = "Branch")
+                    },
+                    placeholder = {
+                        Text(text = "main")
+                    },
+                    supportingText = {
+                        Text(text = "Clone this branch; pull/push will stay on it")
+                    },
+                    singleLine = true,
+                )
+            }
+
             SetupButton(
                 modifier = Modifier.padding(vertical = 10.dp),
                 text = stringResource(R.string.clone_repo),
@@ -230,13 +265,15 @@ fun PickRepoScreen(
                         vm.cloneRepoAutomatic(
                             repoName = repoInfo.fullRepoName,
                             storageConfig = storageConfig,
+                            branch = branch.value.text.ifBlank { repoInfo.defaultBranch },
                             onSuccess = onSuccess,
                         )
                     }
 
                     onClone()
                 },
-                enabled = selected.value !is Selected.None,
+                enabled = selected.value !is Selected.None &&
+                    (selected.value !is Selected.Index || branch.value.text.isNotBlank()),
             )
         }
     }

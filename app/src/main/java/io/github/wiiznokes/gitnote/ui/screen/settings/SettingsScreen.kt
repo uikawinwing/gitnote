@@ -183,15 +183,42 @@ fun SettingsScreen(
                 }
             )
 
-            /*
+            val editorFontSize by vm.prefs.editorFontSize.getAsState()
+            MultipleChoiceSettings(
+                title = stringResource(R.string.editor_font_size),
+                subtitle = "$editorFontSize sp",
+                options = listOf(12, 14, 16, 18, 20, 22, 24),
+                onOptionClick = {
+                    vm.update { vm.prefs.editorFontSize.update(it) }
+                }
+            )
+
             val showLinesNumber by vm.prefs.showLinesNumber.getAsState()
             ToggleableSettings(
                 title = stringResource(R.string.show_lines_number),
-                checked = showLinesNumber
-            ) {
-                vm.update { vm.prefs.showLinesNumber.update(it) }
-            }
-             */
+                checked = showLinesNumber,
+                onCheckedChange = {
+                    vm.update { vm.prefs.showLinesNumber.update(it) }
+                }
+            )
+
+            val showIndentGuides by vm.prefs.showIndentGuides.getAsState()
+            ToggleableSettings(
+                title = stringResource(R.string.show_indent_guides),
+                checked = showIndentGuides,
+                onCheckedChange = {
+                    vm.update { vm.prefs.showIndentGuides.update(it) }
+                }
+            )
+
+            val validateTextStructure by vm.prefs.validateTextStructure.getAsState()
+            ToggleableSettings(
+                title = stringResource(R.string.validate_text_structure),
+                checked = validateTextStructure,
+                onCheckedChange = {
+                    vm.update { vm.prefs.validateTextStructure.update(it) }
+                }
+            )
         }
 
         SettingsSection(

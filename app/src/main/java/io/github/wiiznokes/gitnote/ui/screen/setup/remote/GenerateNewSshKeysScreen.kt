@@ -9,12 +9,14 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.ClipEntry
@@ -67,6 +69,9 @@ fun GenerateNewSshKeysScreen(
 
         val publicKey = rememberSaveable { mutableStateOf("") }
         val privateKey = rememberSaveable { mutableStateOf("") }
+        val branch = rememberSaveable(stateSaver = TextFieldValue.Saver) {
+            mutableStateOf(TextFieldValue())
+        }
 
         LaunchedEffect(true) {
             val (public, private) = generateSshKeys()
@@ -158,7 +163,20 @@ fun GenerateNewSshKeysScreen(
 
 
             SetupLine(
-                text = "3. " + stringResource(R.string.try_cloning)
+                text = "3. Branch (optional)"
+            ) {
+                OutlinedTextField(
+                    modifier = Modifier.fillMaxWidth(),
+                    value = branch.value,
+                    onValueChange = { branch.value = it },
+                    label = { Text(text = "Branch") },
+                    placeholder = { Text(text = "main") },
+                    singleLine = true,
+                )
+            }
+
+            SetupLine(
+                text = "4. " + stringResource(R.string.try_cloning)
             ) {
 
                 SetupButton(
@@ -167,6 +185,7 @@ fun GenerateNewSshKeysScreen(
                         vm.cloneRepo(
                             storageConfig = storageConfig,
                             remoteUrl = url,
+                            branch = branch.value.text.ifBlank { null },
                             cred = Cred.Ssh(
                                 publicKey = publicKey.value,
                                 privateKey = privateKey.value,

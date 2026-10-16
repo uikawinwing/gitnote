@@ -76,6 +76,8 @@ import io.github.wiiznokes.gitnote.ui.model.FileExtension
 import io.github.wiiznokes.gitnote.ui.model.GridNote
 import io.github.wiiznokes.gitnote.ui.model.NoteViewType
 import io.github.wiiznokes.gitnote.ui.screen.app.DrawerScreen
+import io.github.wiiznokes.gitnote.ui.screen.app.folderPathsForRepo
+import io.github.wiiznokes.gitnote.ui.screen.app.folderPreferenceKey
 import io.github.wiiznokes.gitnote.ui.viewmodel.GridViewModel
 
 
@@ -99,13 +101,36 @@ fun GridScreen(
 
     ModalNavigationDrawer(drawerState = drawerState, drawerContent = {
         ModalDrawerSheet {
+            val repoPath = vm.prefs.repoPathSafely()
+            val pinned = folderPathsForRepo(
+                repoPath, vm.prefs.pinnedFolderKeys.getAsState().value
+            )
+            val hidden = folderPathsForRepo(
+                repoPath, vm.prefs.hiddenFolderKeys.getAsState().value
+            )
             DrawerScreen(
                 drawerState = drawerState,
                 currentNoteFolderRelativePath = vm.currentNoteFolderRelativePath.collectAsState().value,
                 drawerFolders = vm.drawerFolders.collectAsState().value,
+                pinnedPaths = pinned,
+                hiddenPaths = hidden,
                 openFolder = vm::openFolder,
                 deleteFolder = vm::deleteFolder,
                 createNoteFolder = vm::createNoteFolder,
+                togglePinned = { path ->
+                    vm.updateSettings {
+                        val key = folderPreferenceKey(this.repoPath(), path)
+                        val current = pinnedFolderKeys.get()
+                        pinnedFolderKeys.update(if (key in current) current - key else current + key)
+                    }
+                },
+                toggleHidden = { path ->
+                    vm.updateSettings {
+                        val key = folderPreferenceKey(this.repoPath(), path)
+                        val current = hiddenFolderKeys.get()
+                        hiddenFolderKeys.update(if (key in current) current - key else current + key)
+                    }
+                },
             )
         }
     }) {
@@ -170,6 +195,7 @@ fun GridScreen(
                 syncState = vm.syncState.collectAsState().value,
                 consumeOkSyncState = vm::consumeOkSyncState,
                 isReadOnlyModeActive = vm.prefs.isReadOnlyModeActive.getAsState().value,
+                showNotePreview = vm.prefs.showNotePreview.getAsState().value,
                 updateSettings = vm::updateSettings,
                 unselectAllNotes = vm::unselectAllNotes,
                 deleteSelectedNotes = vm::deleteSelectedNotes,
@@ -205,6 +231,7 @@ private fun GridView(
     })
 
     val showFullPathOfNotes = vm.prefs.showFullPathOfNotes.getAsState()
+    val showNotePreview = vm.prefs.showNotePreview.getAsState()
 
     Box {
 
@@ -230,6 +257,7 @@ private fun GridView(
                     modifier = commonModifier,
                     selectedNotes = selectedNotes,
                     showFullPathOfNotes = showFullPathOfNotes.value,
+                    showNotePreview = showNotePreview.value,
                     onEditClick = onEditClick,
                     vm = vm,
                 )
@@ -277,6 +305,7 @@ private fun GridNotesView(
     modifier: Modifier = Modifier,
     selectedNotes: List<Note>,
     showFullPathOfNotes: Boolean,
+    showNotePreview: Boolean,
     onEditClick: (Note, EditType) -> Unit,
     vm: GridViewModel,
 ) {
@@ -307,6 +336,7 @@ private fun GridNotesView(
                 onEditClick = onEditClick,
                 selectedNotes = selectedNotes,
                 showFullPathOfNotes = showFullPathOfNotes,
+                showNotePreview = showNotePreview,
                 showFullNoteHeight = showFullNoteHeight.value,
                 modifier = Modifier.padding(3.dp)
             )
@@ -325,6 +355,7 @@ private fun NoteCard(
     onEditClick: (Note, EditType) -> Unit,
     selectedNotes: List<Note>,
     showFullPathOfNotes: Boolean,
+    showNotePreview: Boolean,
     showFullNoteHeight: Boolean,
     modifier: Modifier = Modifier,
 ) {
@@ -391,14 +422,21 @@ private fun NoteCard(
                 verticalArrangement = Arrangement.Top,
                 horizontalAlignment = Alignment.Start,
             ) {
-                val title = if (showFullPathOfNotes || !gridNote.isUnique) {
-                    gridNote.note.relativePath
-                } else {
-                    gridNote.note.nameWithoutExtension()
+                val currentFolder = vm.currentNoteFolderRelativePath.collectAsState().value
+                val title = gridNote.note.fullName()
+                val parentPath = gridNote.note.parentPath()
+                val pathLabel = when {
+                    parentPath.isEmpty() || parentPath == currentFolder -> null
+                    showFullPathOfNotes || currentFolder.isEmpty() -> parentPath
+                    parentPath.startsWith("$currentFolder/") ->
+                        parentPath.removePrefix("$currentFolder/")
+                    !gridNote.isUnique -> parentPath
+                    else -> null
                 }
+
                 Text(
                     text = title,
-                    modifier = Modifier.padding(bottom = 6.dp),
+                    modifier = Modifier.padding(bottom = if (pathLabel == null) 6.dp else 2.dp),
                     overflow = TextOverflow.Ellipsis,
                     style = MaterialTheme.typography.titleMedium.copy(
                         fontWeight = FontWeight.Bold,
@@ -406,29 +444,42 @@ private fun NoteCard(
                     color = MaterialTheme.colorScheme.tertiary
                 )
 
-                if (gridNote.note.fileExtension() is FileExtension.Md) {
-
-                    MarkdownCustom(
-                        content = gridNote.note.content,
-                        onClick = {
-                            if (selectedNotes.isEmpty()) {
-                                onEditClick(
-                                    gridNote.note, EditType.Update
-                                )
-                            } else {
-                                vm.selectNote(
-                                    gridNote.note, add = !gridNote.selected
-                                )
-                            }
-                        }
-                    )
-                } else {
+                if (pathLabel != null) {
                     Text(
-                        text = gridNote.note.content,
-                        modifier = Modifier,
+                        text = pathLabel,
+                        modifier = Modifier.padding(bottom = 6.dp),
+                        maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
-                        color = MaterialTheme.colorScheme.onSurface
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                }
+
+                if (showNotePreview) {
+                    if (gridNote.note.fileExtension() is FileExtension.Md) {
+
+                        MarkdownCustom(
+                            content = gridNote.note.content,
+                            onClick = {
+                                if (selectedNotes.isEmpty()) {
+                                    onEditClick(
+                                        gridNote.note, EditType.Update
+                                    )
+                                } else {
+                                    vm.selectNote(
+                                        gridNote.note, add = !gridNote.selected
+                                    )
+                                }
+                            }
+                        )
+                    } else {
+                        Text(
+                            text = gridNote.note.content,
+                            modifier = Modifier,
+                            overflow = TextOverflow.Ellipsis,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
                 }
             }
         }

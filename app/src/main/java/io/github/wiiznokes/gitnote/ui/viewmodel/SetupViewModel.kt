@@ -39,6 +39,7 @@ interface SetupViewModelI {
     fun cloneRepo(
         storageConfig: StorageConfiguration,
         remoteUrl: String,
+        branch: String? = null,
         cred: Cred? = null,
         onSuccess: () -> Unit
     ) {
@@ -54,6 +55,7 @@ interface SetupViewModelI {
     fun cloneRepoAutomatic(
         repoName: String,
         storageConfig: StorageConfiguration,
+        branch: String? = null,
         onSuccess: () -> Unit
     ) {
     }
@@ -195,6 +197,7 @@ class SetupViewModel(val authFlow: SharedFlow<String>) : ViewModel(), SetupViewM
     override fun cloneRepo(
         storageConfig: StorageConfiguration,
         remoteUrl: String,
+        branch: String?,
         cred: Cred?,
         onSuccess: () -> Unit
     ) {
@@ -203,6 +206,7 @@ class SetupViewModel(val authFlow: SharedFlow<String>) : ViewModel(), SetupViewM
             cloneRepoInternal(
                 storageConfig = storageConfig,
                 remoteUrl = remoteUrl,
+                branch = branch,
                 cred = cred,
                 onSuccess = onSuccess
             )
@@ -212,6 +216,7 @@ class SetupViewModel(val authFlow: SharedFlow<String>) : ViewModel(), SetupViewM
     suspend fun cloneRepoInternal(
         storageConfig: StorageConfiguration,
         remoteUrl: String,
+        branch: String? = null,
         cred: Cred?,
         onSuccess: () -> Unit
     ) {
@@ -225,6 +230,7 @@ class SetupViewModel(val authFlow: SharedFlow<String>) : ViewModel(), SetupViewM
         gitManager.cloneRepo(
             repoPath = storageConfig.repoPath(),
             repoUrl = remoteUrl,
+            branch = branch,
             cred = cred,
             progressCallback = {
                 _initState.tryEmit(InitState.Cloning(it))
@@ -321,6 +327,7 @@ class SetupViewModel(val authFlow: SharedFlow<String>) : ViewModel(), SetupViewM
     override fun cloneRepoAutomatic(
         repoName: String,
         storageConfig: StorageConfiguration,
+        branch: String?,
         onSuccess: () -> Unit
     ) {
 
@@ -343,6 +350,7 @@ class SetupViewModel(val authFlow: SharedFlow<String>) : ViewModel(), SetupViewM
             cloneRepoInternal(
                 storageConfig = storageConfig,
                 remoteUrl = provider!!.sshCloneUrlFromRepoName(repoName),
+                branch = branch,
                 cred = Cred.Ssh(
                     publicKey = publicKey,
                     privateKey = privateKey,

@@ -3,6 +3,8 @@ package io.github.wiiznokes.gitnote.ui.screen.app.edit
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.scrollable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -13,15 +15,22 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Redo
 import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -30,8 +39,13 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import io.github.wiiznokes.gitnote.R
+import io.github.wiiznokes.gitnote.data.TokenCounterMode
 import io.github.wiiznokes.gitnote.ui.viewmodel.edit.TextVM
 import io.github.wiiznokes.gitnote.utils.getParentPath
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 val bottomBarHeight = 50.dp
 
@@ -57,6 +71,7 @@ fun DefaultRow(
                 .align(Alignment.BottomStart),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            TokenCountSwitch(vm)
             leftContent()
         }
 
@@ -85,20 +100,105 @@ fun DefaultRow(
         val bottomSheetExpanded = rememberSaveable { mutableStateOf(false) }
 
         if (bottomSheetExpanded.value) {
+            val findText = rememberSaveable { mutableStateOf("") }
+            val replaceText = rememberSaveable { mutableStateOf("") }
+            val matchCount = vm.matchCount(findText.value)
+
             ModalBottomSheet(onDismissRequest = { bottomSheetExpanded.value = false }) {
-                Text(
+                Column(
                     modifier = Modifier
-                        .padding(10.dp),
-                    text = stringResource(R.string.extension, vm.previousNote.fileExtension().text)
-                )
-                Text(
-                    modifier = Modifier
-                        .padding(10.dp),
-                    text = stringResource(
-                        R.string.parent_path,
-                        getParentPath(vm.previousNote.relativePath)
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp)
+                        .padding(bottom = 20.dp)
+                ) {
+                    Text(
+                        modifier = Modifier.padding(vertical = 8.dp),
+                        text = stringResource(R.string.search_and_replace)
                     )
-                )
+
+                    OutlinedTextField(
+                        modifier = Modifier.fillMaxWidth(),
+                        value = findText.value,
+                        onValueChange = { findText.value = it },
+                        label = { Text(stringResource(R.string.find_text)) },
+                        singleLine = true,
+                    )
+
+                    OutlinedTextField(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 8.dp),
+                        value = replaceText.value,
+                        onValueChange = { replaceText.value = it },
+                        label = { Text(stringResource(R.string.replace_with)) },
+                        singleLine = true,
+                        enabled = !isReadOnlyModeActive,
+                    )
+
+                    Text(
+                        modifier = Modifier.padding(top = 8.dp),
+                        text = stringResource(R.string.matches_count, matchCount)
+                    )
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Button(
+                            onClick = { vm.findNext(findText.value) },
+                            enabled = findText.value.isNotEmpty() && matchCount > 0,
+                        ) {
+                            Text(stringResource(R.string.find_next))
+                        }
+
+                        Button(
+                            modifier = Modifier.padding(start = 8.dp),
+                            onClick = {
+                                vm.replaceCurrent(
+                                    query = findText.value,
+                                    replacement = replaceText.value
+                                )
+                            },
+                            enabled = !isReadOnlyModeActive &&
+                                findText.value.isNotEmpty() &&
+                                matchCount > 0,
+                        ) {
+                            Text(stringResource(R.string.replace_current))
+                        }
+                    }
+
+                    Button(
+                        modifier = Modifier.padding(top = 8.dp),
+                        onClick = {
+                            vm.replaceAll(
+                                query = findText.value,
+                                replacement = replaceText.value
+                            )
+                        },
+                        enabled = !isReadOnlyModeActive &&
+                            findText.value.isNotEmpty() &&
+                            matchCount > 0,
+                    ) {
+                        Text(stringResource(R.string.replace_all))
+                    }
+
+                    Text(
+                        modifier = Modifier.padding(top = 16.dp),
+                        text = stringResource(
+                            R.string.extension,
+                            vm.previousNote.fileExtension().text
+                        )
+                    )
+                    Text(
+                        modifier = Modifier.padding(top = 6.dp),
+                        text = stringResource(
+                            R.string.parent_path,
+                            getParentPath(vm.previousNote.relativePath)
+                        )
+                    )
+                }
             }
         }
 
@@ -116,6 +216,68 @@ fun DefaultRow(
     }
 }
 
+
+
+@Composable
+private fun TokenCountSwitch(vm: TextVM) {
+    val mode = vm.prefs.tokenCounterMode.getAsState().value
+    val text = vm.content.value.text
+    val scope = rememberCoroutineScope()
+    val tokenCount = remember(mode) { mutableStateOf<Int?>(null) }
+    val failed = remember(mode) { mutableStateOf(false) }
+
+    LaunchedEffect(text, mode) {
+        failed.value = false
+
+        if (text.isEmpty()) {
+            tokenCount.value = 0
+            return@LaunchedEffect
+        }
+
+        tokenCount.value = null
+        delay(250)
+
+        val result = withContext(
+            if (mode == TokenCounterMode.Gemini) Dispatchers.IO else Dispatchers.Default
+        ) {
+            runCatching { TextTokenCounter.count(text, mode) }
+        }
+
+        tokenCount.value = result.getOrNull()
+        failed.value = result.isFailure
+    }
+
+    val modeLabel = when (mode) {
+        TokenCounterMode.Generic -> "Generic"
+        TokenCounterMode.Gemini -> "Gemini"
+    }
+    val countLabel = when {
+        tokenCount.value != null -> tokenCount.value.toString()
+        failed.value -> "—"
+        else -> "…"
+    }
+
+    TextButton(
+        modifier = Modifier.height(36.dp),
+        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
+        onClick = {
+            val nextMode = when (mode) {
+                TokenCounterMode.Generic -> TokenCounterMode.Gemini
+                TokenCounterMode.Gemini -> TokenCounterMode.Generic
+            }
+
+            scope.launch {
+                vm.prefs.tokenCounterMode.update(nextMode)
+            }
+        }
+    ) {
+        Text(
+            text = "$modeLabel · $countLabel",
+            style = MaterialTheme.typography.labelSmall,
+            maxLines = 1,
+        )
+    }
+}
 
 @Composable
 fun SmallSeparator(

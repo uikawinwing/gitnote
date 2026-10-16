@@ -20,6 +20,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.surfaceColorAtElevation
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -48,6 +49,7 @@ internal fun NoteListView(
     onEditClick: (Note, EditType) -> Unit,
     vm: GridViewModel,
 ) {
+    val currentFolder = vm.currentNoteFolderRelativePath.collectAsState().value
 
     LazyColumn(
         modifier = modifier,
@@ -68,6 +70,7 @@ internal fun NoteListView(
                 onEditClick = onEditClick,
                 selectedNotes = selectedNotes,
                 showFullPathOfNotes = showFullPathOfNotes,
+                currentFolder = currentFolder,
             )
         }
 
@@ -84,6 +87,7 @@ private fun NoteListRow(
     onEditClick: (Note, EditType) -> Unit,
     selectedNotes: List<Note>,
     showFullPathOfNotes: Boolean,
+    currentFolder: String,
 ) {
     val dropDownExpanded = remember { mutableStateOf(false) }
     val clickPosition = remember { mutableStateOf(Offset.Zero) }
@@ -93,7 +97,14 @@ private fun NoteListRow(
             .format(Date(gridNote.note.lastModifiedTimeMillis))
     }
 
-    val title = gridNote.note.relativePath
+    val title = gridNote.note.fullName()
+    val parentPath = gridNote.note.parentPath()
+    val pathLabel = when {
+        parentPath.isEmpty() || parentPath == currentFolder -> null
+        showFullPathOfNotes || currentFolder.isEmpty() -> parentPath
+        parentPath.startsWith("$currentFolder/") -> parentPath.removePrefix("$currentFolder/")
+        else -> parentPath
+    }
 
     val rowBackground =
         if (gridNote.selected) MaterialTheme.colorScheme.surfaceColorAtElevation(6.dp)
@@ -152,6 +163,17 @@ private fun NoteListRow(
                         ),
                         color = MaterialTheme.colorScheme.onSurface
                     )
+
+                    if (pathLabel != null) {
+                        Text(
+                            text = pathLabel,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.tertiary
+                        )
+                    }
+
                     Text(
                         text = formattedDate,
                         maxLines = 1,

@@ -68,6 +68,7 @@ class GithubProvider : Provider {
             val owner = repo.getJSONObject("owner").getString("login")
             val url = repo.getString("ssh_url")
             val updatedAt = repo.getString("updated_at")
+            val defaultBranch = repo.optString("default_branch", "main")
             val timeMillis = dateFormat.parse(updatedAt)?.time ?: 0L
 
             repos.add(
@@ -75,7 +76,8 @@ class GithubProvider : Provider {
                     owner = owner,
                     name = name,
                     url = url,
-                    lastModifiedTimeMillis = timeMillis
+                    lastModifiedTimeMillis = timeMillis,
+                    defaultBranch = defaultBranch
                 )
             )
         }

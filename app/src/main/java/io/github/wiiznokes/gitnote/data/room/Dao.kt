@@ -155,7 +155,9 @@ interface RepoDatabaseDao {
             WITH notes_with_filename AS (
                 SELECT *, fullName(relativePath) AS fileName
                 FROM Notes
-                WHERE relativePath LIKE :currentNoteFolderRelativePath || '%'
+                WHERE :currentNoteFolderRelativePath = ''
+                   OR substr(relativePath, 1, length(:currentNoteFolderRelativePath) + 1)
+                      = :currentNoteFolderRelativePath || '/'
             )
             SELECT *,
                    CASE 
@@ -203,7 +205,9 @@ interface RepoDatabaseDao {
                 FROM Notes
                 JOIN NotesFts ON NotesFts.rowid = Notes.rowid
                 WHERE
-                    Notes.relativePath LIKE :currentNoteFolderRelativePath || '%'
+                    (:currentNoteFolderRelativePath = ''
+                     OR substr(Notes.relativePath, 1, length(:currentNoteFolderRelativePath) + 1)
+                        = :currentNoteFolderRelativePath || '/')
                     AND
                     NotesFts MATCH :query
             )
@@ -249,6 +253,19 @@ interface RepoDatabaseDao {
 
         val query = SimpleSQLiteQuery(sql, arrayOf(currentNoteFolderRelativePath))
         return this.gridDrawerFoldersRaw(query)
+    }
+
+    fun drawerFolderTree(): Flow<List<DrawerFolderModel>> {
+        val sql = """
+            SELECT f.relativePath, f.id, COUNT(n.relativePath) as noteCount
+            FROM NoteFolders AS f
+            LEFT JOIN Notes AS n ON n.relativePath LIKE f.relativePath || '/%'
+            WHERE f.relativePath != ''
+            GROUP BY f.relativePath, f.id
+            ORDER BY f.relativePath COLLATE NOCASE ASC
+        """.trimIndent()
+
+        return this.gridDrawerFoldersRaw(SimpleSQLiteQuery(sql))
     }
 
     @RawQuery(observedEntities = [Note::class, NoteFolder::class])

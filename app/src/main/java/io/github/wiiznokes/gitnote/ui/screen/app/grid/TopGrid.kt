@@ -106,6 +106,7 @@ fun TopBar(
     syncState: SyncState,
     consumeOkSyncState: () -> Unit,
     isReadOnlyModeActive: Boolean,
+    showNotePreview: Boolean,
     updateSettings: (suspend AppPreferences.() -> Unit) -> Unit,
     unselectAllNotes: () -> Unit,
     deleteSelectedNotes: () -> Unit,
@@ -130,6 +131,7 @@ fun TopBar(
                 syncState = syncState,
                 consumeOkSyncState = consumeOkSyncState,
                 isReadOnlyModeActive = isReadOnlyModeActive,
+                showNotePreview = showNotePreview,
                 updateSettings = updateSettings,
             )
         } else {
@@ -159,6 +161,7 @@ private fun SearchBar(
     syncState: SyncState,
     consumeOkSyncState: () -> Unit,
     isReadOnlyModeActive: Boolean,
+    showNotePreview: Boolean,
     updateSettings: (suspend AppPreferences.() -> Unit) -> Unit,
 ) {
 
@@ -301,6 +304,20 @@ private fun SearchBar(
                                     onClick = {
                                         updateSettings {
                                             this.isReadOnlyModeActive.update(!isReadOnlyModeActive)
+                                        }
+                                    }
+                                ),
+                                CustomDropDownModel(
+                                    text = stringResource(
+                                        if (showNotePreview) {
+                                            R.string.hide_note_preview
+                                        } else {
+                                            R.string.show_note_preview
+                                        }
+                                    ),
+                                    onClick = {
+                                        updateSettings {
+                                            this.showNotePreview.update(!showNotePreview)
                                         }
                                     }
                                 ),
@@ -529,6 +546,7 @@ private fun TopBarPreview() {
         syncState = SyncState.Error("hello"),
         consumeOkSyncState = {},
         isReadOnlyModeActive = true,
+        showNotePreview = true,
         updateSettings = { },
         selectedNotesNumber = 0,
         unselectAllNotes = { },

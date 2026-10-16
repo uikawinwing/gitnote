@@ -7,6 +7,9 @@ import io.github.wiiznokes.gitnote.data.removeFirstAndLastSlash
 import io.github.wiiznokes.gitnote.ui.model.FileExtension
 import io.github.wiiznokes.gitnote.utils.toResult
 import java.io.File
+import java.nio.file.AtomicMoveNotSupportedException
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 import java.nio.file.Path
 import java.nio.file.Paths
 import java.nio.file.attribute.FileTime
@@ -106,6 +109,30 @@ sealed class NodeFs(
 
         fun write(text: String): Result<Unit> {
             return toResult { pathFs.writeText(text) }
+        }
+
+        /**
+         * Finish writing a temporary sibling before replacing the actual note.
+         * A failed write must never truncate or delete the previous content.
+         */
+        fun writeSafely(text: String): Result<Unit> = toResult {
+            pathFs.createParentDirectories()
+            val temporary = Files.createTempFile(pathFs.parent, ".gitnote-save-", ".tmp")
+            try {
+                temporary.writeText(text)
+                try {
+                    Files.move(
+                        temporary, pathFs,
+                        StandardCopyOption.ATOMIC_MOVE,
+                        StandardCopyOption.REPLACE_EXISTING
+                    )
+                } catch (_: AtomicMoveNotSupportedException) {
+                    Files.move(temporary, pathFs, StandardCopyOption.REPLACE_EXISTING)
+                }
+            } finally {
+                Files.deleteIfExists(temporary)
+            }
+            Unit
         }
 
         fun readText(): String {

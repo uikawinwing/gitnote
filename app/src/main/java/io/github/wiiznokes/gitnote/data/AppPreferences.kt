@@ -137,7 +137,12 @@ class AppPreferences(
 
     val noteMinWidth = enumPreference("noteMinWidth", NoteMinWidth.Default)
     val showFullNoteHeight = booleanPreference("showFullNoteHeight", false)
+    val showNotePreview = booleanPreference("showNotePreview", true)
     val noteViewType = enumPreference("noteViewType", NoteViewType.Grid)
+
+    // UI-only folder metadata: never change files, .gitignore, or Git sync behavior.
+    val pinnedFolderKeys = setPreference("pinnedFolderKeys", emptySet<String>())
+    val hiddenFolderKeys = setPreference("hiddenFolderKeys", emptySet<String>())
 
     val rememberLastOpenedFolder = booleanPreference("rememberLastOpenedFolder", false)
     val lastOpenedFolder = stringPreference("lastOpenedFolder", "")
@@ -145,7 +150,11 @@ class AppPreferences(
     val showFullPathOfNotes = booleanPreference("showFullPathOfNotes", false)
 
     val defaultExtension = stringPreference("defaultExtension", "md")
-    val showLinesNumber = booleanPreference("showLinesNumber", false)
+    val showLinesNumber = booleanPreference("showLinesNumber", true)
+    val editorFontSize = intPreference("editorFontSize", 16)
+    val showIndentGuides = booleanPreference("showIndentGuides", true)
+    val validateTextStructure = booleanPreference("validateTextStructure", true)
+    val tokenCounterMode = enumPreference("tokenCounterMode", TokenCounterMode.Generic)
 
     val folderFilters = setPreference(
         "folderFilters", setOf(
@@ -185,4 +194,9 @@ class AppPreferences(
 enum class StorageConfig {
     App,
     Device
+}
+
+enum class TokenCounterMode {
+    Generic,
+    Gemini
 }

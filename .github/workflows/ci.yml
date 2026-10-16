@@ -52,6 +52,13 @@ jobs:
         run: |
           ./gradlew assembleDebug lintDebug testDebugUnitTest --stacktrace
 
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v7
+        with:
+          name: gitnote-debug
+          path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+
   tests:
     name: Rust tests
     strategy:
