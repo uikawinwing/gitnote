@@ -132,6 +132,7 @@ sealed class NodeFs(
             } finally {
                 Files.deleteIfExists(temporary)
             }
+            Unit
         }
 
         fun readText(): String {
