@@ -155,7 +155,9 @@ interface RepoDatabaseDao {
             WITH notes_with_filename AS (
                 SELECT *, fullName(relativePath) AS fileName
                 FROM Notes
-                WHERE relativePath LIKE :currentNoteFolderRelativePath || '%'
+                WHERE :currentNoteFolderRelativePath = ''
+                   OR substr(relativePath, 1, length(:currentNoteFolderRelativePath) + 1)
+                      = :currentNoteFolderRelativePath || '/'
             )
             SELECT *,
                    CASE 
@@ -203,7 +205,9 @@ interface RepoDatabaseDao {
                 FROM Notes
                 JOIN NotesFts ON NotesFts.rowid = Notes.rowid
                 WHERE
-                    Notes.relativePath LIKE :currentNoteFolderRelativePath || '%'
+                    (:currentNoteFolderRelativePath = ''
+                     OR substr(Notes.relativePath, 1, length(:currentNoteFolderRelativePath) + 1)
+                        = :currentNoteFolderRelativePath || '/')
                     AND
                     NotesFts MATCH :query
             )

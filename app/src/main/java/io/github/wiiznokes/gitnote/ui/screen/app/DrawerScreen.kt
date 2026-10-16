@@ -161,18 +161,8 @@ fun DrawerScreen(
                                 }
                             )
                             .combinedClickable(
-                                onLongClick = { selectFolder(path) },
-                                onClick = {
-                                    if (hasChildren) {
-                                        expandedFolders = if (expanded) {
-                                            expandedFolders - path
-                                        } else {
-                                            expandedFolders + path
-                                        }
-                                    } else {
-                                        selectFolder(path)
-                                    }
-                                }
+                                onLongClick = { dropDownExpanded.value = true },
+                                onClick = { selectFolder(path) }
                             )
                             .pointerInteropFilter {
                                 clickPosition.value = Offset(it.x, it.y)
@@ -187,19 +177,30 @@ fun DrawerScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Box(
-                            modifier = Modifier.size(36.dp),
+                            modifier = Modifier.size(44.dp),
                             contentAlignment = Alignment.Center
                         ) {
                             if (hasChildren) {
-                                Icon(
-                                    imageVector = if (expanded) {
-                                        Icons.Rounded.KeyboardArrowDown
-                                    } else {
-                                        Icons.Rounded.KeyboardArrowRight
-                                    },
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
+                                IconButton(
+                                    modifier = Modifier.size(44.dp),
+                                    onClick = {
+                                        expandedFolders = if (expanded) {
+                                            expandedFolders - path
+                                        } else {
+                                            expandedFolders + path
+                                        }
+                                    }
+                                ) {
+                                    Icon(
+                                        imageVector = if (expanded) {
+                                            Icons.Rounded.KeyboardArrowDown
+                                        } else {
+                                            Icons.Rounded.KeyboardArrowRight
+                                        },
+                                        contentDescription = if (expanded) "Collapse folder" else "Expand folder",
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
                             }
                         }
 
