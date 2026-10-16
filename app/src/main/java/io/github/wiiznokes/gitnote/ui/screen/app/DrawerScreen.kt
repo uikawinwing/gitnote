@@ -3,6 +3,7 @@ package io.github.wiiznokes.gitnote.ui.screen.app
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -18,6 +19,9 @@ import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.rounded.MoreVert
+import androidx.compose.material.icons.rounded.Star
+import androidx.compose.material.icons.rounded.Visibility
+import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.material3.DrawerState
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -25,6 +29,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -49,6 +54,7 @@ import io.github.wiiznokes.gitnote.data.room.NoteFolder
 import io.github.wiiznokes.gitnote.ui.component.CustomDropDown
 import io.github.wiiznokes.gitnote.ui.component.CustomDropDownModel
 import io.github.wiiznokes.gitnote.ui.component.GetStringDialog
+import io.github.wiiznokes.gitnote.ui.component.RequestConfirmationDialog
 import kotlinx.coroutines.launch
 
 data class DrawerFolderModel(
@@ -82,12 +88,17 @@ fun DrawerScreen(
     drawerState: DrawerState,
     currentNoteFolderRelativePath: String,
     drawerFolders: List<DrawerFolderModel>,
+    pinnedPaths: Set<String>,
+    hiddenPaths: Set<String>,
     openFolder: (String) -> Unit,
     deleteFolder: (NoteFolder) -> Unit,
     createNoteFolder: (relativeParentPath: String, name: String) -> Boolean,
+    togglePinned: (String) -> Unit,
+    toggleHidden: (String) -> Unit,
 ) {
     val scope = rememberCoroutineScope()
     var expandedFolders by remember { mutableStateOf(ancestorsOf(currentNoteFolderRelativePath)) }
+    var showHidden by rememberSaveable { mutableStateOf(false) }
 
     LaunchedEffect(currentNoteFolderRelativePath) {
         expandedFolders = expandedFolders + ancestorsOf(currentNoteFolderRelativePath)
@@ -108,8 +119,21 @@ fun DrawerScreen(
             .toSet()
     }
 
-    val visibleFolders = remember(drawerFolders, expandedFolders) {
-        drawerFolders.filter { isVisibleInTree(it.noteFolder.relativePath, expandedFolders) }
+    val visibleFolders = remember(drawerFolders, expandedFolders, hiddenPaths, showHidden) {
+        drawerFolders.filter { folder ->
+            val path = folder.noteFolder.relativePath
+            isVisibleInTree(path, expandedFolders) &&
+                (showHidden || !isFolderHidden(path, hiddenPaths))
+        }
+    }
+    val favoriteFolders = remember(drawerFolders, pinnedPaths, hiddenPaths, showHidden) {
+        drawerFolders.filter { folder ->
+            val path = folder.noteFolder.relativePath
+            path in pinnedPaths && (showHidden || !isFolderHidden(path, hiddenPaths))
+        }.sortedBy { it.noteFolder.relativePath.lowercase() }
+    }
+    val hasHiddenFolders = remember(drawerFolders, hiddenPaths) {
+        drawerFolders.any { it.noteFolder.relativePath in hiddenPaths }
     }
 
     Scaffold(
@@ -124,6 +148,59 @@ fun DrawerScreen(
         LazyColumn(
             modifier = Modifier.padding(paddingValues)
         ) {
+            if (favoriteFolders.isNotEmpty()) {
+                item(key = "favorites_heading") {
+                    Text(
+                        text = "Starred folders",
+                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                items(
+                    favoriteFolders,
+                    key = { "favorite:" + it.noteFolder.relativePath }
+                ) { favorite ->
+                    val path = favorite.noteFolder.relativePath
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { selectFolder(path) }
+                            .padding(horizontal = 18.dp, vertical = 5.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Rounded.Star, contentDescription = null)
+                        Text(
+                            text = favorite.noteFolder.fullName(),
+                            modifier = Modifier.weight(1f).padding(start = 12.dp),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        IconButton(onClick = { togglePinned(path) }) {
+                            Icon(Icons.Rounded.Star, contentDescription = "Remove favorite")
+                        }
+                    }
+                }
+            }
+
+            if (hasHiddenFolders) {
+                item(key = "show_hidden_folders") {
+                    TextButton(
+                        modifier = Modifier.fillMaxWidth(),
+                        onClick = { showHidden = !showHidden }
+                    ) {
+                        Icon(
+                            imageVector = if (showHidden) Icons.Rounded.VisibilityOff else Icons.Rounded.Visibility,
+                            contentDescription = null
+                        )
+                        Text(
+                            text = if (showHidden) "Hide hidden folders" else "Show hidden folders",
+                            modifier = Modifier.padding(start = 8.dp)
+                        )
+                    }
+                }
+            }
+
             items(
                 visibleFolders,
                 key = { it.noteFolder.id }
@@ -136,15 +213,31 @@ fun DrawerScreen(
 
                 Box {
                     val dropDownExpanded = remember { mutableStateOf(false) }
+                    val deleteConfirmation = remember { mutableStateOf(false) }
                     val clickPosition = remember { mutableStateOf(Offset.Zero) }
+                    val pinned = path in pinnedPaths
+                    val explicitlyHidden = path in hiddenPaths
+
+                    RequestConfirmationDialog(
+                        expanded = deleteConfirmation,
+                        text = "Delete folder \"$path\" and all its contents? This cannot be undone."
+                    ) { deleteFolder(drawerFolder.noteFolder) }
 
                     CustomDropDown(
                         expanded = dropDownExpanded,
                         shape = MaterialTheme.shapes.medium,
                         options = listOf(
                             CustomDropDownModel(
+                                text = if (pinned) "Unstar folder" else "Star folder",
+                                onClick = { togglePinned(path) }
+                            ),
+                            CustomDropDownModel(
+                                text = if (explicitlyHidden) "Show folder" else "Hide folder",
+                                onClick = { toggleHidden(path) }
+                            ),
+                            CustomDropDownModel(
                                 text = stringResource(R.string.delete_this_folder),
-                                onClick = { deleteFolder(drawerFolder.noteFolder) }
+                                onClick = { deleteConfirmation.value = true }
                             )
                         ),
                         clickPosition = clickPosition
@@ -220,7 +313,11 @@ fun DrawerScreen(
                                 .padding(start = 8.dp),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
-                            color = MaterialTheme.colorScheme.onSurface
+                            color = if (isFolderHidden(path, hiddenPaths)) {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            } else {
+                                MaterialTheme.colorScheme.onSurface
+                            }
                         )
 
                         Text(
